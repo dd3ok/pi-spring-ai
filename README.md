@@ -8,7 +8,7 @@ and replayable sessions for Java/Spring developers.
 
 ## Repository Baseline
 
-이 저장소의 제품/프로젝트 이름은 `pi-spring-ai`로 둔다. GitHub 저장소 이름은 현재 `spring-pi-agent`지만, 문서와 코드의 애플리케이션 이름은 `pi-spring-ai`를 기준으로 한다.
+이 저장소의 제품/프로젝트 이름과 GitHub 저장소 이름은 모두 `pi-spring-ai`로 둔다. 문서와 코드의 애플리케이션 이름도 같은 이름을 기준으로 한다.
 
 기준 문서는 다음 파일이다.
 
