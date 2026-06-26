@@ -22,6 +22,7 @@ extra["springAiVersion"] = "2.0.0"
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.boot:spring-boot-starter-webflux")
+    implementation("org.springframework.ai:spring-ai-starter-model-openai")
 
     testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
     testImplementation("org.springframework.boot:spring-boot-starter-webflux-test")

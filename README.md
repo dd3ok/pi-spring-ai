@@ -49,7 +49,7 @@ and replayable sessions for Java/Spring developers.
 
 ## Current Status
 
-현재는 `M0 Project bootstrap` 단계다. Spring Boot 애플리케이션 골격, Gradle wrapper, 기본 `application.yml`, health endpoint smoke test를 추가했다.
+현재는 `M1 ChatClient hello` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint를 추가했다.
 
 선택한 초기 버전과 의존성은 다음과 같다.
 
@@ -58,8 +58,9 @@ and replayable sessions for Java/Spring developers.
 - Spring AI BOM 2.0.0
 - Spring WebFlux: 이후 SSE endpoint를 위한 웹 기반
 - Spring Boot Actuator: M0에서 `/actuator/health`로 애플리케이션 시작 상태를 확인하기 위한 최소 health endpoint
+- Spring AI OpenAI starter: M1에서 `ChatClient`와 OpenAI chat model auto-configuration을 사용하기 위한 model starter
 
-아직 Spring AI model starter는 추가하지 않았다. 실제 `ChatClient` 연결은 다음 단계 `M1 ChatClient hello`에서 붙인다.
+아직 AgentRuntime, tool calling, session store는 구현하지 않았다. 이들은 M2 이후 단계에서 순서대로 붙인다.
 
 ## Run
 
@@ -73,4 +74,32 @@ Windows PowerShell에서는 다음처럼 실행한다.
 .\gradlew.bat test
 ```
 
-다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M1` 프롬프트를 기준으로 시작한다.
+테스트는 실제 외부 LLM API를 호출하지 않는다. 컨트롤러 테스트는 fake model service를 사용하고, 전체 context smoke test는 테스트용 dummy API key만 사용한다.
+
+## Chat API
+
+실제 `/api/chat` endpoint를 호출하려면 OpenAI API key가 필요하다.
+
+```powershell
+$env:OPENAI_API_KEY = "your-openai-api-key"
+$env:OPENAI_MODEL = "gpt-4.1-mini"
+.\gradlew.bat bootRun
+```
+
+요청 예시는 다음과 같다.
+
+```powershell
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/api/chat" `
+  -ContentType "application/json" `
+  -Body '{"text":"hello"}'
+```
+
+응답 형태:
+
+```json
+{"content":"..."}
+```
+
+다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M2` 프롬프트를 기준으로 시작한다.

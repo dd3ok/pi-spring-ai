@@ -41,9 +41,9 @@
 
 각 글을 발행할 때 해당 커밋 해시를 글 하단에 남긴다. 필요하면 나중에 `blog/m0`, `blog/m1` 같은 태그를 붙인다.
 
-## 다음 글 초안 메모
+## 구현 메모
 
-다음 글은 `M0 Project bootstrap`이다. 핵심 질문은 다음과 같다.
+### M0 Project bootstrap
 
 - 왜 Spring Boot 4.x와 Spring AI 2.x를 기준으로 잡는가?
 - 왜 처음부터 agent runtime을 만들지 않는가?
@@ -55,3 +55,19 @@ M0 구현 메모:
 - WebFlux는 이후 SSE event stream을 위해 먼저 둔다.
 - Actuator는 `/actuator/health` smoke test를 위해 둔다.
 - 실제 OpenAI model starter는 M1에서 추가한다.
+
+### M1 ChatClient hello
+
+핵심 질문은 다음과 같다.
+
+- 왜 agent runtime보다 `/api/chat`을 먼저 붙이는가?
+- 왜 controller test에서 fake service를 쓰는가?
+- 왜 OpenAI starter는 M1에서야 추가하는가?
+
+M1 구현 메모:
+
+- Spring AI OpenAI starter는 `ChatClient` auto-configuration을 사용하기 위해 추가한다.
+- `/api/chat`은 아직 session, tool, event stream과 연결하지 않는다.
+- 외부 LLM API는 테스트에서 호출하지 않는다.
+- 실제 실행에는 `OPENAI_API_KEY`가 필요하지만, 테스트는 dummy key와 fake service만 사용한다.
+- 다음 글은 `M2 Agent domain model`이다.
