@@ -1,0 +1,23 @@
+spring:
+  application:
+    name: pi-spring-ai
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+
+agent:
+  workspace:
+    root: .
+    max-read-bytes: 200000
+    max-directory-entries: 200
+    max-grep-matches: 100
+  tools:
+    write-enabled-by-default: false
+    bash-enabled-by-default: false
+    bash-timeout-seconds: 30
+    max-tool-output-chars: 20000
+  session:
+    root: .pi-spring-ai/sessions
+  model:
+    provider: openai
+    name: gpt-4.1-mini

@@ -1,10 +1,26 @@
-# Existing project contents are intentionally ignored per request.
+# Existing root copies are intentionally ignored. Canonical project docs live in /docs.
 /00_START_HERE.md
 /01_SOT.md
 /02_DESIGN.md
 /03_IMPLEMENTATION_PLAN.md
 /04_CODEX_TASK_PROMPTS.md
-/AGENTS.md
 /codex-prompts/
-/docs/
 /skills/
+
+# Build and local runtime output.
+/.gradle/
+/build/
+/out/
+*.class
+/.pi-spring-ai/
+
+# Local secrets. Test fixtures can still add explicit fake files later if needed.
+/.env
+/.env.*
+/*.pem
+/*.key
+/id_rsa
+/id_ed25519
+/secrets.*
+/application-prod.yml
+/application-prod.yaml
