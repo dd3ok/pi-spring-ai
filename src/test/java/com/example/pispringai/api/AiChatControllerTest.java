@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
@@ -26,6 +27,16 @@ class AiChatControllerTest {
             .expectStatus().isOk()
             .expectBody()
             .jsonPath("$.content").isEqualTo("fake response to hello");
+    }
+
+    @Test
+    void chatRejectsBlankText() {
+        webTestClient.post()
+            .uri("/api/chat")
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue("{\"text\":\"   \"}")
+            .exchange()
+            .expectStatus().isBadRequest();
     }
 
     @TestConfiguration

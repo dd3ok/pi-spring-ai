@@ -20,6 +20,7 @@ public class SpringAiChatService implements AiChatService {
                 .user(text)
                 .call()
                 .content())
+            .defaultIfEmpty("")
             .subscribeOn(Schedulers.boundedElastic());
     }
 }
