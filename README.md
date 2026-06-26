@@ -49,7 +49,7 @@ and replayable sessions for Java/Spring developers.
 
 ## Current Status
 
-현재는 `M1 ChatClient hello` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint를 추가했다.
+현재는 `M1 ChatClient hello` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint를 추가했고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있게 했다.
 
 선택한 초기 버전과 의존성은 다음과 같다.
 
@@ -58,7 +58,8 @@ and replayable sessions for Java/Spring developers.
 - Spring AI BOM 2.0.0
 - Spring WebFlux: 이후 SSE endpoint를 위한 웹 기반
 - Spring Boot Actuator: M0에서 `/actuator/health`로 애플리케이션 시작 상태를 확인하기 위한 최소 health endpoint
-- Spring AI OpenAI starter: M1에서 `ChatClient`와 OpenAI chat model auto-configuration을 사용하기 위한 model starter
+- Spring AI Google GenAI starter: Gemini를 기본 chat provider로 쓰기 위한 model starter
+- Spring AI OpenAI starter: OpenAI provider 전환 예제를 유지하기 위한 model starter
 
 아직 AgentRuntime, tool calling, session store는 구현하지 않았다. 이들은 M2 이후 단계에서 순서대로 붙인다.
 
@@ -74,15 +75,25 @@ Windows PowerShell에서는 다음처럼 실행한다.
 .\gradlew.bat test
 ```
 
-테스트는 실제 외부 LLM API를 호출하지 않는다. 컨트롤러 테스트는 fake model service를 사용하고, 전체 context smoke test는 테스트용 dummy API key만 사용한다.
+테스트는 실제 외부 LLM API를 호출하지 않는다. 컨트롤러 테스트는 fake model service를 사용하고, Spring context 테스트는 Google GenAI auto-configuration을 통과시키기 위한 테스트용 dummy API key만 사용한다.
 
 ## Chat API
 
-실제 `/api/chat` endpoint를 호출하려면 OpenAI API key가 필요하다.
+실제 `/api/chat` endpoint는 기본적으로 Gemini Google GenAI provider를 사용한다. Gemini API key는 Google AI Studio에서 만들 수 있고, 로컬 실행 시 `GEMINI_API_KEY` 또는 `GOOGLE_API_KEY`로 전달한다.
 
 ```powershell
+$env:GEMINI_API_KEY = "your-gemini-api-key"
+$env:GEMINI_MODEL = "gemini-2.5-flash"
+.\gradlew.bat bootRun
+```
+
+OpenAI로 전환하려면 provider와 OpenAI key를 같이 지정한다.
+
+```powershell
+$env:AGENT_MODEL_PROVIDER = "openai"
 $env:OPENAI_API_KEY = "your-openai-api-key"
 $env:OPENAI_MODEL = "gpt-4.1-mini"
+$env:AGENT_MODEL_NAME = "gpt-4.1-mini"
 .\gradlew.bat bootRun
 ```
 

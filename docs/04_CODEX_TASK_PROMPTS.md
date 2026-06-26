@@ -107,7 +107,7 @@ Spring AI ChatClient를 사용해서 가장 작은 /api/chat endpoint를 만들�
 완료 조건:
 - Controller 테스트 또는 smoke test 추가
 - ./gradlew test 통과
-- README에 OPENAI_API_KEY 또는 모델 설정 방법 추가
+- README에 GEMINI_API_KEY, OPENAI_API_KEY, 모델 provider 설정 방법 추가
 ```
 
 ---

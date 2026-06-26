@@ -754,8 +754,17 @@ spring:
   application:
     name: pi-spring-ai
   ai:
+    model:
+      chat: ${AGENT_MODEL_PROVIDER:google-genai}
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY:${GOOGLE_API_KEY:}}
+        chat:
+          model: ${GEMINI_MODEL:gemini-2.5-flash}
     openai:
       api-key: ${OPENAI_API_KEY:}
+      chat:
+        model: ${OPENAI_MODEL:gpt-4.1-mini}
 
 agent:
   workspace:
@@ -771,8 +780,8 @@ agent:
   session:
     root: .pi-spring-ai/sessions
   model:
-    provider: openai
-    name: gpt-4.1-mini
+    provider: ${AGENT_MODEL_PROVIDER:google-genai}
+    name: ${AGENT_MODEL_NAME:${GEMINI_MODEL:gemini-2.5-flash}}
 ```
 
 실제 모델명은 구현 시점의 사용 가능 모델로 조정한다. SOT의 핵심은 특정 모델명이 아니라 모델 호출 계층 분리다.
