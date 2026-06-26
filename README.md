@@ -49,7 +49,15 @@ and replayable sessions for Java/Spring developers.
 
 ## Current Status
 
-현재는 `M1 ChatClient hello` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint를 추가했고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있게 했다.
+현재는 `M2 Agent domain model` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
+
+M2에서는 아직 LLM tool calling, session store, AgentRuntime을 붙이지 않고 AgentRuntime 구현 전에 필요한 순수 도메인 타입만 추가했다.
+
+- `AgentMessage`: `UserMessage`, `AssistantMessage`, `ToolResultMessage`
+- `AgentEvent`: lifecycle, assistant, tool call, denial, error event
+- `AgentRunOptions`: read-only safe defaults
+- `AgentPromptCommand`: session/workspace/user prompt command
+- `IdGenerator`: session/message/event/tool-call ID 생성
 
 선택한 초기 버전과 의존성은 다음과 같다.
 
@@ -61,7 +69,7 @@ and replayable sessions for Java/Spring developers.
 - Spring AI Google GenAI starter: Gemini를 기본 chat provider로 쓰기 위한 model starter
 - Spring AI OpenAI starter: OpenAI provider 전환 예제를 유지하기 위한 model starter
 
-아직 AgentRuntime, tool calling, session store는 구현하지 않았다. 이들은 M2 이후 단계에서 순서대로 붙인다.
+아직 AgentRuntime, tool calling, session store는 구현하지 않았다. 이들은 M3 이후 단계에서 순서대로 붙인다.
 
 ## Run
 
@@ -113,4 +121,4 @@ Invoke-RestMethod `
 {"content":"..."}
 ```
 
-다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M2` 프롬프트를 기준으로 시작한다.
+다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M3` 프롬프트를 기준으로 시작한다.
