@@ -7,7 +7,12 @@ import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTest
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 @AutoConfigureWebTestClient
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {
+                "AGENT_MODEL_PROVIDER=google-genai",
+                "spring.ai.google.genai.api-key=test-gemini-api-key"
+        })
 class PiSpringAiApplicationTests {
 
     @Autowired

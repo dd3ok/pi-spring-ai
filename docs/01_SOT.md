@@ -122,7 +122,7 @@ MVP는 다음을 포함한다.
 ### 4.2 모델 호출
 
 - Spring AI `ChatClient` 사용
-- OpenAI 또는 Anthropic 중 하나를 기본 예제로 사용
+- Gemini Google GenAI를 기본 예제로 사용하고 OpenAI 전환 경로를 유지한다
 - 로컬 개발용 Ollama는 선택 기능으로 둔다
 - 모델 선택은 설정 파일로 분리한다
 

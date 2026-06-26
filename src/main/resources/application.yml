@@ -2,6 +2,13 @@ spring:
   application:
     name: pi-spring-ai
   ai:
+    model:
+      chat: ${AGENT_MODEL_PROVIDER:google-genai}
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY:${GOOGLE_API_KEY:}}
+        chat:
+          model: ${GEMINI_MODEL:gemini-2.5-flash}
     openai:
       api-key: ${OPENAI_API_KEY:}
       chat:
@@ -21,5 +28,5 @@ agent:
   session:
     root: .pi-spring-ai/sessions
   model:
-    provider: openai
-    name: gpt-4.1-mini
+    provider: ${AGENT_MODEL_PROVIDER:google-genai}
+    name: ${AGENT_MODEL_NAME:${GEMINI_MODEL:gemini-2.5-flash}}

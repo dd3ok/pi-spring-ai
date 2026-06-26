@@ -54,7 +54,7 @@ M0 구현 메모:
 - Spring Boot는 `4.1.0`, Spring AI BOM은 `2.0.0`으로 고정한다.
 - WebFlux는 이후 SSE event stream을 위해 먼저 둔다.
 - Actuator는 `/actuator/health` smoke test를 위해 둔다.
-- 실제 OpenAI model starter는 M1에서 추가한다.
+- 실제 model starter는 M1에서 추가한다. 기본 예제는 Gemini Google GenAI로 두고, OpenAI starter는 provider 전환 예제로 유지한다.
 
 ### M1 ChatClient hello
 
@@ -62,12 +62,19 @@ M0 구현 메모:
 
 - 왜 agent runtime보다 `/api/chat`을 먼저 붙이는가?
 - 왜 controller test에서 fake service를 쓰는가?
-- 왜 OpenAI starter는 M1에서야 추가하는가?
+- 왜 model starter는 M1에서야 추가하는가?
 
 M1 구현 메모:
 
-- Spring AI OpenAI starter는 `ChatClient` auto-configuration을 사용하기 위해 추가한다.
+- Spring AI Google GenAI starter는 Gemini를 기본 provider로 쓰기 위해 추가한다.
+- Spring AI OpenAI starter는 같은 `/api/chat` 코드가 provider 설정만 바꿔도 확장되는 예제로 유지한다.
 - `/api/chat`은 아직 session, tool, event stream과 연결하지 않는다.
 - 외부 LLM API는 테스트에서 호출하지 않는다.
-- 실제 실행에는 `OPENAI_API_KEY`가 필요하지만, 테스트는 dummy key와 fake service만 사용한다.
+- 실제 실행에는 `GEMINI_API_KEY` 또는 `OPENAI_API_KEY`가 필요하지만, 테스트는 dummy key와 fake service만 사용한다.
 - 다음 글은 `M2 Agent domain model`이다.
+
+M1.1 provider 변경 메모:
+
+- Gemini API는 무료 tier가 있어 학습/블로그 독자가 따라 해 보기 쉽다.
+- `spring.ai.model.chat`을 `${AGENT_MODEL_PROVIDER:google-genai}`로 두어 기본값은 Gemini, 전환값은 OpenAI가 되게 한다.
+- 테스트에서는 Google GenAI auto-configuration을 통과시키기 위한 dummy key만 사용하고, 실제 외부 API 호출은 하지 않는다.
