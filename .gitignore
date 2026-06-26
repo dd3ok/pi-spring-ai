@@ -8,6 +8,7 @@
 /skills/
 
 # Build and local runtime output.
+/.agent/
 /.gradle/
 /build/
 /out/
