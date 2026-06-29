@@ -49,7 +49,7 @@ and replayable sessions for Java/Spring developers.
 
 ## Current Status
 
-현재는 `M3 JSONL session store` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
+현재는 `M4 Workspace guard` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
 
 M2에서는 아직 LLM tool calling, session store, AgentRuntime을 붙이지 않고 AgentRuntime 구현 전에 필요한 순수 도메인 타입만 추가했다.
 
@@ -67,6 +67,14 @@ M3에서는 API/SSE나 AgentRuntime에 연결하지 않고, 파일 기반 세션
 - `events.jsonl`: `type` discriminator가 있는 flat concrete event JSON
 - 알 수 없는 discriminator, malformed JSONL, 없는 session, sessionId path traversal, 손상된 `session.json`은 명시적으로 실패
 
+M4에서는 아직 read/ls/find/grep 도구를 만들지 않고, 앞으로 파일 도구가 공통으로 사용할 workspace guard만 추가했다.
+
+- `WorkspaceProperties`: `agent.workspace.root`를 절대경로로 정규화하고 read/list/grep 제한 기본값을 유지
+- `SafePathResolver`: 사용자 입력 경로를 workspace root 안으로만 resolve
+- `resolveExisting`: 존재하는 파일/디렉터리는 real path 기준으로 검사해서 symlink escape를 차단
+- `resolveForFuturePath`: 나중에 write 계층에서 새 경로에만 쓸 수 있도록 존재하는 parent real path 기준 검증 제공
+- `SecretFileGuard`: `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `application-prod.yml`, `application-prod.yaml`, `secrets.*` 차단
+
 선택한 초기 버전과 의존성은 다음과 같다.
 
 - Java 21 toolchain with `--release 21`
@@ -77,7 +85,7 @@ M3에서는 API/SSE나 AgentRuntime에 연결하지 않고, 파일 기반 세션
 - Spring AI Google GenAI starter: Gemini를 기본 chat provider로 쓰기 위한 model starter
 - Spring AI OpenAI starter: OpenAI provider 전환 예제를 유지하기 위한 model starter
 
-아직 AgentRuntime과 tool calling은 구현하지 않았다. 이들은 M4 이후 단계에서 순서대로 붙인다.
+아직 read-only tools, AgentRuntime, tool calling은 구현하지 않았다. 이들은 M5 이후 단계에서 순서대로 붙인다.
 
 ## Run
 
@@ -129,4 +137,4 @@ Invoke-RestMethod `
 {"content":"..."}
 ```
 
-다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M4` 프롬프트를 기준으로 시작한다.
+다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M5` 프롬프트를 기준으로 시작한다.
