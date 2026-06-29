@@ -15,11 +15,13 @@ import com.example.pispringai.agent.message.AssistantMessage;
 import com.example.pispringai.agent.message.AssistantStopReason;
 import com.example.pispringai.agent.message.ToolResultMessage;
 import com.example.pispringai.agent.message.UserMessage;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -35,6 +37,7 @@ class JsonlSessionStoreTest {
     private final ObjectMapper objectMapper = JsonMapper.builder()
             .findAndAddModules()
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
             .build();
 
     @TempDir
@@ -110,6 +113,32 @@ class JsonlSessionStoreTest {
     }
 
     @Test
+    void appendUsesLfLineSeparatorInJsonlFiles() throws Exception {
+        JsonlSessionStore store = newStore();
+        AgentSession session = store.create(tempDir.resolve("workspace"));
+
+        store.appendMessage(session.id(), sampleUserMessage(session.id()));
+
+        String content = Files.readString(sessionDir(session.id()).resolve("messages.jsonl"), StandardCharsets.UTF_8);
+        assertThat(content).endsWith("\n");
+        assertThat(content).doesNotContain("\r");
+    }
+
+    @Test
+    void loadMessagesSkipsBlankJsonlLines() throws Exception {
+        JsonlSessionStore store = newStore();
+        AgentSession session = store.create(tempDir.resolve("workspace"));
+        UserMessage message = sampleUserMessage(session.id());
+        Path messages = sessionDir(session.id()).resolve("messages.jsonl");
+        Files.writeString(
+                messages,
+                "\n" + objectMapper.writeValueAsString(message) + "\n   \n",
+                StandardCharsets.UTF_8);
+
+        assertThat(store.loadMessages(session.id())).containsExactly(message);
+    }
+
+    @Test
     void appendsAndLoadsAllEventVariantsAsFlatJsonlInOrder() throws Exception {
         JsonlSessionStore store = newStore();
         AgentSession session = store.create(tempDir.resolve("workspace"));
@@ -153,6 +182,20 @@ class JsonlSessionStoreTest {
         assertThat(first.has("payload")).isFalse();
         assertThat(first.has("json")).isFalse();
         assertThat(objectMapper.readTree(lines.get(8)).get("type").asText()).isEqualTo("agent_completed");
+    }
+
+    @Test
+    void loadEventsSkipsBlankJsonlLines() throws Exception {
+        JsonlSessionStore store = newStore();
+        AgentSession session = store.create(tempDir.resolve("workspace"));
+        AgentStartedEvent event = sampleStartedEvent(session.id());
+        Path events = sessionDir(session.id()).resolve("events.jsonl");
+        Files.writeString(
+                events,
+                "\n" + objectMapper.writeValueAsString(event) + "\n   \n",
+                StandardCharsets.UTF_8);
+
+        assertThat(store.loadEvents(session.id())).containsExactly(event);
     }
 
     @Test

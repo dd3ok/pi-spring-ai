@@ -16,12 +16,12 @@ import com.example.pispringai.agent.message.AssistantMessage;
 import com.example.pispringai.agent.message.ToolResultMessage;
 import com.example.pispringai.agent.message.UserMessage;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,7 +30,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Repository;
 
 import static com.example.pispringai.agent.AgentDomainValidation.requireNonNull;
@@ -45,17 +45,11 @@ public class JsonlSessionStore implements SessionStore {
     private final Path root;
     private final ObjectMapper objectMapper;
 
-    @Autowired
-    public JsonlSessionStore(SessionProperties properties) {
-        this(properties, defaultObjectMapper());
-    }
-
-    JsonlSessionStore(SessionProperties properties, ObjectMapper objectMapper) {
+    public JsonlSessionStore(
+            SessionProperties properties,
+            @Qualifier("sessionObjectMapper") ObjectMapper objectMapper) {
         this.root = requireNonNull(properties, "properties").root();
-        this.objectMapper = requireNonNull(objectMapper, "objectMapper").copy()
-                .findAndRegisterModules()
-                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        this.objectMapper = requireNonNull(objectMapper, "objectMapper");
     }
 
     @Override
@@ -107,6 +101,9 @@ public class JsonlSessionStore implements SessionStore {
             int lineNumber = 0;
             while ((line = reader.readLine()) != null) {
                 lineNumber++;
+                if (line.isBlank()) {
+                    continue;
+                }
                 JsonNode root = readJsonObject(line, "message", lineNumber);
                 String kind = textDiscriminator(root, "kind", "message kind", lineNumber);
                 loaded.add(toMessage(new StoredMessage(kind, root), lineNumber));
@@ -127,6 +124,9 @@ public class JsonlSessionStore implements SessionStore {
             int lineNumber = 0;
             while ((line = reader.readLine()) != null) {
                 lineNumber++;
+                if (line.isBlank()) {
+                    continue;
+                }
                 JsonNode root = readJsonObject(line, "event", lineNumber);
                 String type = textDiscriminator(root, "type", "event type", lineNumber);
                 loaded.add(toEvent(new StoredEvent(type, root), lineNumber));
@@ -163,7 +163,14 @@ public class JsonlSessionStore implements SessionStore {
 
     private void writeSessionMetadata(AgentSession session) throws IOException {
         StoredSession stored = StoredSession.from(session);
-        objectMapper.writeValue(sessionDirectory(session.id()).resolve(SESSION_JSON).toFile(), stored);
+        Path sessionJson = sessionDirectory(session.id()).resolve(SESSION_JSON);
+        try (OutputStream output = Files.newOutputStream(
+                sessionJson,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING,
+                StandardOpenOption.WRITE)) {
+            objectMapper.writeValue(output, stored);
+        }
     }
 
     private AgentSession readSessionMetadata(String sessionId) {
@@ -171,8 +178,8 @@ public class JsonlSessionStore implements SessionStore {
         if (!Files.isRegularFile(sessionJson)) {
             throw new SessionStoreException("Session metadata not found: " + sessionId);
         }
-        try {
-            StoredSession stored = objectMapper.readValue(sessionJson.toFile(), StoredSession.class);
+        try (InputStream input = Files.newInputStream(sessionJson)) {
+            StoredSession stored = objectMapper.readValue(input, StoredSession.class);
             return stored.toAgentSession();
         } catch (IOException | RuntimeException ex) {
             throw new SessionStoreException("Failed to read session metadata for session " + sessionId, ex);
@@ -184,7 +191,7 @@ public class JsonlSessionStore implements SessionStore {
             String line = objectMapper.writeValueAsString(value);
             Files.writeString(
                     path,
-                    line + System.lineSeparator(),
+                    line + "\n",
                     StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE,
                     StandardOpenOption.APPEND);
@@ -267,10 +274,6 @@ public class JsonlSessionStore implements SessionStore {
         if (Files.notExists(path)) {
             Files.createFile(path);
         }
-    }
-
-    private static ObjectMapper defaultObjectMapper() {
-        return new ObjectMapper();
     }
 
     private record StoredSession(
