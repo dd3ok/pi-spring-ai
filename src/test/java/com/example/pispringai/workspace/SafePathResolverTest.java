@@ -67,6 +67,18 @@ class SafePathResolverTest {
     }
 
     @Test
+    void deniesUnixRootAbsoluteExampleOutsideWorkspace() {
+        assertThatThrownBy(() -> newResolver().resolveExisting("/etc/passwd"))
+                .isInstanceOf(WorkspaceAccessDeniedException.class);
+    }
+
+    @Test
+    void deniesWindowsDriveAbsoluteExampleOutsideWorkspace() {
+        assertThatThrownBy(() -> newResolver().resolveExisting("C:/outside/file.txt"))
+                .isInstanceOf(WorkspaceAccessDeniedException.class);
+    }
+
+    @Test
     void deniesExistingSymlinkThatEscapesWorkspace() throws Exception {
         Path outside = Files.writeString(tempDir.resolve("outside.txt"), "no");
         Path link = createSymlink(workspace.resolve("outside-link.txt"), outside);
