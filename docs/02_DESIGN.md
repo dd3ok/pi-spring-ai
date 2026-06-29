@@ -114,7 +114,7 @@ Client
 {"type":"agent_started","sessionId":"s1"}
 {"type":"user_message_appended","messageId":"m1"}
 {"type":"tool_call_started","tool":"ls","callId":"tc1"}
-{"type":"tool_call_finished","tool":"ls","callId":"tc1","status":"success"}
+{"type":"tool_call_finished","tool":"ls","callId":"tc1","error":false}
 {"type":"assistant_delta","text":"이 프로젝트는"}
 {"type":"assistant_delta","text":" Spring Boot 기반입니다."}
 {"type":"assistant_completed","messageId":"m2"}
@@ -650,27 +650,76 @@ public interface SessionStore {
 
 ```json
 {"kind":"user","id":"m1","sessionId":"s1","parentId":null,"createdAt":"...","text":"프로젝트 분석해줘"}
-{"kind":"toolResult","id":"m2","sessionId":"s1","parentId":"m1","createdAt":"...","toolCallId":"tc1","toolName":"ls","resultText":"README.md","error":false}
+{"kind":"tool_result","id":"m2","sessionId":"s1","parentId":"m1","createdAt":"...","toolCallId":"tc1","toolName":"ls","resultText":"README.md","error":false}
 ```
 
 `events.jsonl`
 
 ```json
 {"type":"tool_call_started","eventId":"e1","sessionId":"s1","createdAt":"...","tool":"ls","callId":"tc1"}
+{"type":"tool_call_finished","eventId":"e2","sessionId":"s1","createdAt":"...","tool":"ls","callId":"tc1","error":false}
 ```
 
 ### 9.4 ObjectMapper 설정
 
 Java time, sealed type 직렬화를 고려한다.
 
-처음에는 sealed interface 자동 다형성 설정이 복잡하면 envelope DTO를 둔다.
+M3에서는 sealed interface에 Jackson 다형성 설정을 직접 붙이지 않고 envelope DTO를 사용한다.
+
+이유:
+
+- JSONL은 한 줄이 독립적인 JSON record여야 하므로 `kind`/`type` discriminator가 사람이 바로 읽혀야 한다.
+- `AgentMessage`, `AgentEvent` 도메인 타입을 Jackson 저장 방식에 과하게 묶지 않는다.
+- subtype annotation을 도메인 계층에 늘리기보다 session 저장 계층에서 명시적으로 변환한다.
+- M3 범위에서는 message/event append-load만 필요하고, API/SSE/runtime 역직렬화는 아직 필요하지 않다.
 
 ```java
 public record StoredMessage(
     String kind,
-    JsonNode payload
+    JsonNode json
+) {}
+
+public record StoredEvent(
+    String type,
+    JsonNode json
 ) {}
 ```
+
+`StoredMessage`와 `StoredEvent`는 on-disk wrapper 형식이 아니라 load 과정에서 root JSON object를 들고 다니는 내부 DTO다.
+
+즉 파일에 다음처럼 쓰지 않는다.
+
+```json
+{"kind":"user","payload":{"id":"m1", "...":"..."}}
+```
+
+파일에는 M2에서 고정한 flat concrete JSON object를 그대로 쓴다.
+
+```json
+{"kind":"user","id":"m1","sessionId":"s1","parentId":null,"createdAt":"...","text":"프로젝트 분석해줘"}
+```
+
+`JsonlSessionStore`는 저장 시 concrete record를 flat JSON object로 쓰고, 읽을 때는 root object의 `kind` 또는 `type` 값으로 switch 하여 concrete record로 복원한다.
+
+M3에서 명시적으로 테스트한다:
+
+- flat JSONL shape이며 `payload` wrapper가 생기지 않는다.
+- append 순서대로 load된다.
+- 알 수 없는 `kind`/`type`은 실패한다.
+- `kind`/`type` 누락 또는 문자열이 아닌 discriminator는 실패한다.
+- malformed JSONL은 실패한다.
+- `findSession`은 없는 session에 대해 empty를 반환한다.
+- `appendMessage`, `appendEvent`, `loadMessages`, `loadEvents`는 없는 session에 대해 명확히 실패한다.
+- sessionId로 session root 밖 경로를 만들 수 없다.
+- 손상된 `session.json`은 조용히 empty로 처리하지 않고 실패한다.
+
+M3에서 하지 않는다:
+
+- `@JsonTypeInfo` 기반 sealed hierarchy 전역 다형성 설정
+- 별도 DB 또는 index 파일
+- session branch/fork
+- compaction
+- AgentRuntime/API/SSE 연결
 
 MVP에서는 유지보수 쉬운 방법을 우선한다.
 

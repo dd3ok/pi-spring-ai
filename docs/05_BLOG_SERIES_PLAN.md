@@ -78,3 +78,40 @@ M1.1 provider 변경 메모:
 - Gemini API는 무료 tier가 있어 학습/블로그 독자가 따라 해 보기 쉽다.
 - `spring.ai.model.chat`을 `${AGENT_MODEL_PROVIDER:google-genai}`로 두어 기본값은 Gemini, 전환값은 OpenAI가 되게 한다.
 - 테스트에서는 Google GenAI auto-configuration을 통과시키기 위한 dummy key만 사용하고, 실제 외부 API 호출은 하지 않는다.
+
+### M2 Agent domain model
+
+핵심 질문은 다음과 같다.
+
+- 왜 에이전트를 "기록 가능한 상태 전이"로 보는가?
+- 왜 Message와 Event를 분리하는가?
+- 왜 실제 tool/runtime/session 구현 전에 타입 계약을 먼저 잡는가?
+
+M2 구현 메모:
+
+- `AgentMessage`와 `AgentEvent`는 Java 21 sealed interface와 record로 둔다.
+- message 본문 필드는 `text`로 통일한다. `messageId`는 message record를 가리키는 ID다.
+- JSON discriminator는 message의 `kind`, event의 `type`으로 둔다.
+- `AgentRunOptions.safeDefaults()`는 read-only 기본값을 표현한다.
+- JSON 테스트는 문자열 포함 검사가 아니라 `JsonNode` field set과 값을 확인한다.
+- sealed interface 다형성 역직렬화는 M2에서 붙이지 않는다.
+- 다음 글은 `M3 JSONL session store`다.
+
+### M3 JSONL session store
+
+핵심 질문은 다음과 같다.
+
+- 왜 MVP에서 DB가 아니라 JSONL append-only log를 쓰는가?
+- 왜 Jackson `@JsonTypeInfo` 대신 root JSON helper DTO와 명시적 switch 매핑을 쓰는가?
+- 사람이 열어볼 수 있는 session log를 어떻게 테스트로 보장하는가?
+
+M3 구현 메모:
+
+- `AgentSession`과 `SessionStore`를 추가한다.
+- `JsonlSessionStore`는 `session.json`, `messages.jsonl`, `events.jsonl`을 관리한다.
+- 저장되는 JSONL 한 줄은 concrete message/event JSON object로 둔다.
+- load 시 `StoredMessage(kind, json)`, `StoredEvent(type, json)` 같은 내부 helper DTO를 사용한다.
+- 파일에는 `payload` wrapper를 쓰지 않고 M2의 flat concrete JSON object를 그대로 저장한다.
+- 알 수 없는 `kind`/`type`은 조용히 무시하지 말고 실패시킨다.
+- `kind`/`type` 누락, 문자열이 아닌 discriminator, malformed JSONL, 손상된 `session.json`, sessionId path traversal도 테스트로 고정한다.
+- M3에서는 API, SSE, AgentRuntime, Tool을 연결하지 않는다.
