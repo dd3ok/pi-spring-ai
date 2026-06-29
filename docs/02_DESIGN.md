@@ -699,7 +699,9 @@ public record StoredEvent(
 {"kind":"user","id":"m1","sessionId":"s1","parentId":null,"createdAt":"...","text":"프로젝트 분석해줘"}
 ```
 
-`JsonlSessionStore`는 저장 시 concrete record를 flat JSON object로 쓰고, 읽을 때는 root object의 `kind` 또는 `type` 값으로 switch 하여 concrete record로 복원한다.
+`JsonlSessionStore`는 저장 시 concrete record를 flat JSON object로 쓴다. 읽을 때는 한 줄을 먼저 `JsonNode root = objectMapper.readTree(line)`로 읽고, root object의 `kind` 또는 `type` 값을 뽑은 뒤 `new StoredMessage(kind, root)` 또는 `new StoredEvent(type, root)`를 만든다. 그 다음 discriminator 값으로 switch 하여 `objectMapper.treeToValue(root, UserMessage.class)`처럼 concrete record로 복원한다.
+
+중요한 점은 flat JSON을 `StoredMessage`/`StoredEvent`로 바로 역직렬화하지 않는다는 것이다. 파일에는 `json` 필드가 없으므로 직접 DTO 역직렬화 대상이 아니다. DTO는 이미 읽은 root object와 discriminator를 함께 넘기기 위한 내부 helper다.
 
 M3에서 명시적으로 테스트한다:
 

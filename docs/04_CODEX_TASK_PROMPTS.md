@@ -187,7 +187,11 @@ Agent 세션, 메시지, 이벤트를 JSONL 파일로 저장하는 SessionStore�
 
 구현 결정:
 - JSONL 한 줄은 concrete message/event JSON object로 둔다.
-- load 시 session 패키지 내부 helper DTO가 root JSON object의 `kind` 또는 `type`과 전체 `json`을 들고, 명시적 switch로 concrete record로 변환한다.
+- load 시 `JsonNode root = objectMapper.readTree(line)`로 먼저 읽는다.
+- root object에서 `kind` 또는 `type` discriminator를 검증한다.
+- session 패키지 내부 helper DTO가 discriminator와 전체 root `json`을 들고, 명시적 switch로 concrete record로 변환한다.
+- concrete record 복원은 `objectMapper.treeToValue(root, UserMessage.class)`처럼 root object를 대상으로 한다.
+- flat JSONL line을 `StoredMessage`/`StoredEvent`로 직접 역직렬화하지 마. 파일에는 `json` 필드가 없다.
 - `StoredMessage`, `StoredEvent`는 내부 load helper이지 on-disk wrapper가 아니다. `{"kind":"user","payload":{...}}` 형태로 저장하지 마.
 - M2 도메인 타입은 저장 방식에 과하게 묶지 않는다.
 ```

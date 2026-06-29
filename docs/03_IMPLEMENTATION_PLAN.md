@@ -231,6 +231,8 @@ src/test/java/.../session/JsonlSessionStoreTest.java
 - Jackson `@JsonTypeInfo`를 도메인 sealed interface에 붙이지 않는다.
 - M3에서는 root JSON object를 담는 load helper DTO와 명시적 switch 매핑을 사용한다.
 - `StoredMessage`, `StoredEvent`는 on-disk wrapper가 아니다. 파일에는 M2 concrete JSON shape 그대로 쓴다.
+- JSONL load 순서는 `readTree(line)` -> discriminator 추출 -> `StoredMessage`/`StoredEvent` 생성 -> switch -> `treeToValue(root, ConcreteRecord.class)`로 고정한다.
+- flat JSONL line을 `StoredMessage`/`StoredEvent`로 직접 역직렬화하지 않는다. 파일에는 `json` 필드가 없다.
 - AgentRuntime, API, SSE와 연결하지 않는다.
 - branch/fork, compaction은 구현하지 않는다.
 

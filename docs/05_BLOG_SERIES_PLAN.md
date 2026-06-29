@@ -111,6 +111,8 @@ M3 구현 메모:
 - `JsonlSessionStore`는 `session.json`, `messages.jsonl`, `events.jsonl`을 관리한다.
 - 저장되는 JSONL 한 줄은 concrete message/event JSON object로 둔다.
 - load 시 `StoredMessage(kind, json)`, `StoredEvent(type, json)` 같은 내부 helper DTO를 사용한다.
+- load 순서는 `readTree(line)` -> discriminator 추출 -> helper DTO 생성 -> switch -> `treeToValue(root, ConcreteRecord.class)`로 설명한다.
+- flat JSONL line을 helper DTO로 직접 역직렬화하지 않는다. 파일에는 `json` 필드가 없다.
 - 파일에는 `payload` wrapper를 쓰지 않고 M2의 flat concrete JSON object를 그대로 저장한다.
 - 알 수 없는 `kind`/`type`은 조용히 무시하지 말고 실패시킨다.
 - `kind`/`type` 누락, 문자열이 아닌 discriminator, malformed JSONL, 손상된 `session.json`, sessionId path traversal도 테스트로 고정한다.
