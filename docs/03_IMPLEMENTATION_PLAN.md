@@ -192,6 +192,7 @@ src/main/java/.../agent/IdGenerator.java
 - `AgentSession` record
 - `SessionStore` interface
 - `JsonlSessionStore` 구현
+- `StoredMessage`, `StoredEvent` load helper DTO
 - session metadata 저장
 - messages.jsonl append/load
 - events.jsonl append/load
@@ -203,6 +204,9 @@ src/main/java/.../session/AgentSession.java
 src/main/java/.../session/SessionStore.java
 src/main/java/.../session/JsonlSessionStore.java
 src/main/java/.../session/SessionProperties.java
+src/main/java/.../session/StoredMessage.java
+src/main/java/.../session/StoredEvent.java
+src/main/java/.../session/SessionStoreException.java
 src/test/java/.../session/JsonlSessionStoreTest.java
 ```
 
@@ -212,11 +216,25 @@ src/test/java/.../session/JsonlSessionStoreTest.java
 - 메시지 append/load 테스트
 - 이벤트 append/load 테스트
 - 사람이 읽을 수 있는 JSONL 포맷
+- `kind`/`type` 값으로 concrete message/event를 복원
+- 알 수 없는 `kind`/`type`은 명시적으로 실패
+- JSONL은 flat concrete object이며 `payload` wrapper를 쓰지 않음
+- `kind`/`type` 누락, 문자열이 아닌 discriminator, malformed JSONL 실패
+- append 순서 보존
+- 없는 session에 대한 append/load 실패와 `findSession` empty
+- sessionId path traversal 차단
+- 손상된 `session.json` 실패
 
 ### 주의
 
 - 처음부터 DB 붙이지 않는다.
-- Jackson 다형성이 복잡하면 envelope DTO 사용한다.
+- Jackson `@JsonTypeInfo`를 도메인 sealed interface에 붙이지 않는다.
+- M3에서는 root JSON object를 담는 load helper DTO와 명시적 switch 매핑을 사용한다.
+- `StoredMessage`, `StoredEvent`는 on-disk wrapper가 아니다. 파일에는 M2 concrete JSON shape 그대로 쓴다.
+- JSONL load 순서는 `readTree(line)` -> discriminator 추출 -> `StoredMessage`/`StoredEvent` 생성 -> switch -> `treeToValue(root, ConcreteRecord.class)`로 고정한다.
+- flat JSONL line을 `StoredMessage`/`StoredEvent`로 직접 역직렬화하지 않는다. 파일에는 `json` 필드가 없다.
+- AgentRuntime, API, SSE와 연결하지 않는다.
+- branch/fork, compaction은 구현하지 않는다.
 
 ---
 

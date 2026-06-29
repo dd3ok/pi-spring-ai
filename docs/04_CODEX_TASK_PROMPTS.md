@@ -155,6 +155,8 @@ Agent 세션, 메시지, 이벤트를 JSONL 파일로 저장하는 SessionStore�
 - SessionStore interface
 - JsonlSessionStore
 - SessionProperties
+- StoredMessage, StoredEvent load helper DTO
+- SessionStoreException
 - messages.jsonl append/load
 - events.jsonl append/load
 - session.json 저장
@@ -163,13 +165,35 @@ Agent 세션, 메시지, 이벤트를 JSONL 파일로 저장하는 SessionStore�
 - DB 붙이지 마
 - branch/fork 구현하지 마
 - compaction 구현하지 마
+- AgentRuntime 구현하지 마
+- API/SSE endpoint 붙이지 마
+- Tool 구현하지 마
+- AgentMessage/AgentEvent sealed interface에 @JsonTypeInfo 기반 다형성 설정을 붙이지 마
 
 완료 조건:
 - 세션 생성 테스트
 - 메시지 append/load 테스트
 - 이벤트 append/load 테스트
 - 사람이 읽을 수 있는 JSONL 형태 유지
+- `kind`/`type` discriminator로 concrete message/event를 복원
+- 알 수 없는 `kind`/`type`은 테스트로 실패 확인
+- JSONL 한 줄은 flat concrete object이고 `payload` wrapper가 없음을 테스트로 확인
+- `kind`/`type` 누락, 문자열이 아닌 discriminator, malformed JSONL 실패 테스트
+- append 순서 보존 테스트
+- 없는 session에 대해 `findSession`은 empty, append/load는 명확한 실패 테스트
+- sessionId path traversal 차단 테스트
+- 손상된 `session.json` 실패 테스트
 - ./gradlew test 통과
+
+구현 결정:
+- JSONL 한 줄은 concrete message/event JSON object로 둔다.
+- load 시 `JsonNode root = objectMapper.readTree(line)`로 먼저 읽는다.
+- root object에서 `kind` 또는 `type` discriminator를 검증한다.
+- session 패키지 내부 helper DTO가 discriminator와 전체 root `json`을 들고, 명시적 switch로 concrete record로 변환한다.
+- concrete record 복원은 `objectMapper.treeToValue(root, UserMessage.class)`처럼 root object를 대상으로 한다.
+- flat JSONL line을 `StoredMessage`/`StoredEvent`로 직접 역직렬화하지 마. 파일에는 `json` 필드가 없다.
+- `StoredMessage`, `StoredEvent`는 내부 load helper이지 on-disk wrapper가 아니다. `{"kind":"user","payload":{...}}` 형태로 저장하지 마.
+- M2 도메인 타입은 저장 방식에 과하게 묶지 않는다.
 ```
 
 ---
