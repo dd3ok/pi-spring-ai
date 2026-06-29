@@ -49,7 +49,7 @@ and replayable sessions for Java/Spring developers.
 
 ## Current Status
 
-현재는 `M2 Agent domain model` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
+현재는 `M3 JSONL session store` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
 
 M2에서는 아직 LLM tool calling, session store, AgentRuntime을 붙이지 않고 AgentRuntime 구현 전에 필요한 순수 도메인 타입만 추가했다.
 
@@ -58,6 +58,14 @@ M2에서는 아직 LLM tool calling, session store, AgentRuntime을 붙이지 �
 - `AgentRunOptions`: read-only safe defaults
 - `AgentPromptCommand`: session/workspace/user prompt command
 - `IdGenerator`: session/message/event/tool-call ID 생성
+
+M3에서는 API/SSE나 AgentRuntime에 연결하지 않고, 파일 기반 세션 저장소만 추가했다.
+
+- `SessionStore`: 세션 생성, 조회, 메시지 append/load, 이벤트 append/load
+- `JsonlSessionStore`: `.pi-spring-ai/sessions/{sessionId}/` 아래 `session.json`, `messages.jsonl`, `events.jsonl` 저장
+- `messages.jsonl`: `kind` discriminator가 있는 flat concrete message JSON
+- `events.jsonl`: `type` discriminator가 있는 flat concrete event JSON
+- 알 수 없는 discriminator, malformed JSONL, 없는 session, sessionId path traversal, 손상된 `session.json`은 명시적으로 실패
 
 선택한 초기 버전과 의존성은 다음과 같다.
 
@@ -69,7 +77,7 @@ M2에서는 아직 LLM tool calling, session store, AgentRuntime을 붙이지 �
 - Spring AI Google GenAI starter: Gemini를 기본 chat provider로 쓰기 위한 model starter
 - Spring AI OpenAI starter: OpenAI provider 전환 예제를 유지하기 위한 model starter
 
-아직 AgentRuntime, tool calling, session store는 구현하지 않았다. 이들은 M3 이후 단계에서 순서대로 붙인다.
+아직 AgentRuntime과 tool calling은 구현하지 않았다. 이들은 M4 이후 단계에서 순서대로 붙인다.
 
 ## Run
 
@@ -121,4 +129,4 @@ Invoke-RestMethod `
 {"content":"..."}
 ```
 
-다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M3` 프롬프트를 기준으로 시작한다.
+다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M4` 프롬프트를 기준으로 시작한다.
