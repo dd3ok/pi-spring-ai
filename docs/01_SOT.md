@@ -349,9 +349,13 @@ DB를 먼저 붙이면 학습 포인트가 흐려진다. Agent session은 append
 - `*.pem`
 - `*.key`
 - `id_rsa`
+- `id_dsa`
+- `id_ecdsa`
 - `id_ed25519`
+- `.git`
 - `application-prod.yml`
 - `application-prod.yaml`
+- `application-prod.properties`
 - `secrets.*`
 
 ---

@@ -19,9 +19,13 @@ class SecretFileGuardTest {
                 "prod.pem",
                 "deploy.key",
                 "id_rsa",
+                "id_dsa",
+                "id_ecdsa",
                 "id_ed25519",
                 "application-prod.yml",
                 "application-prod.yaml",
+                "application-prod.properties",
+                ".git",
                 "secrets.json")
                 .forEach(name -> assertThat(guard.isDenied(Path.of(name))).as(name).isTrue());
     }
@@ -30,6 +34,8 @@ class SecretFileGuardTest {
     void deniesSecretFileNamesInNestedPaths() {
         assertThat(guard.isDenied(Path.of("config", ".env.local"))).isTrue();
         assertThat(guard.isDenied(Path.of("keys", "id_rsa"))).isTrue();
+        assertThat(guard.isDenied(Path.of(".git", "config"))).isTrue();
+        assertThat(guard.isDenied(Path.of(".git", "hooks", "pre-commit"))).isTrue();
     }
 
     @Test
@@ -38,6 +44,10 @@ class SecretFileGuardTest {
                 "README.md",
                 "application.yml",
                 "id_rsa.pub",
+                "id_dsa.pub",
+                "id_ecdsa.pub",
+                "application-prod.properties.example",
+                ".gitignore",
                 "secrets",
                 "secrets-guide.md",
                 "notes.key.md",

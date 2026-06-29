@@ -73,7 +73,7 @@ M4에서는 아직 read/ls/find/grep 도구를 만들지 않고, 앞으로 파�
 - `SafePathResolver`: 사용자 입력 경로를 workspace root 안으로만 resolve
 - `resolveExisting`: 존재하는 파일/디렉터리는 real path 기준으로 검사해서 symlink escape를 차단
 - `resolveForFuturePath`: 나중에 write 계층에서 새 경로에만 쓸 수 있도록 존재하는 parent real path 기준 검증 제공
-- `SecretFileGuard`: `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_ed25519`, `application-prod.yml`, `application-prod.yaml`, `secrets.*` 차단
+- `SecretFileGuard`: `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`, `.git`, `application-prod.yml`, `application-prod.yaml`, `application-prod.properties`, `secrets.*` 차단
 
 선택한 초기 버전과 의존성은 다음과 같다.
 

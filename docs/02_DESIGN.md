@@ -610,10 +610,14 @@ public class SecretFileGuard {
 *.pem
 *.key
 id_rsa
+id_dsa
+id_ecdsa
 id_ed25519
+.git
 secrets.*
 application-prod.yml
 application-prod.yaml
+application-prod.properties
 ```
 
 ---
