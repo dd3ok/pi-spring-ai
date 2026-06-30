@@ -60,6 +60,9 @@ public class GrepTool implements AgentTool {
             if (!Files.isDirectory(root)) {
                 return ToolResult.error("path is not a directory: " + root);
             }
+            if (WorkspaceWalk.shouldSkipRoot(pathResolver.workspaceRoot(), root, secretFileGuard)) {
+                return ToolResult.error("path is denied: " + root);
+            }
 
             SearchResult searchResult = search(root, query);
             Map<String, Object> metadata = new LinkedHashMap<>();
@@ -73,41 +76,41 @@ public class GrepTool implements AgentTool {
     }
 
     private SearchResult search(Path root, String query) throws IOException {
-        List<String> lines = new ArrayList<>();
-        int matches = 0;
-        int skippedLargeFiles = 0;
-        int skippedBinaryFiles = 0;
+        SearchAccumulator accumulator = new SearchAccumulator();
 
-        for (Path file : WorkspaceWalk.regularFiles(root, secretFileGuard)) {
+        WorkspaceWalk.walkRegularFiles(root, secretFileGuard, file -> {
             long size = Files.size(file);
             if (size > workspaceProperties.maxReadBytes()) {
-                skippedLargeFiles++;
-                continue;
+                accumulator.skippedLargeFiles++;
+                return true;
             }
 
             String text;
             try {
                 text = TextFileReader.decodeUtf8Text(Files.readAllBytes(file));
             } catch (CharacterCodingException exception) {
-                skippedBinaryFiles++;
-                continue;
+                accumulator.skippedBinaryFiles++;
+                return true;
             }
 
             String relative = WorkspaceWalk.relativePath(pathResolver.workspaceRoot(), file);
             String[] fileLines = text.split("\\R", -1);
-            for (int index = 0; index < fileLines.length && matches < workspaceProperties.maxGrepMatches(); index++) {
+            for (int index = 0; index < fileLines.length
+                    && accumulator.matches < workspaceProperties.maxGrepMatches(); index++) {
                 String line = fileLines[index];
                 if (line.contains(query)) {
-                    lines.add(relative + ":" + (index + 1) + ":" + line);
-                    matches++;
+                    accumulator.lines.add(relative + ":" + (index + 1) + ":" + line);
+                    accumulator.matches++;
                 }
             }
-            if (matches >= workspaceProperties.maxGrepMatches()) {
-                break;
-            }
-        }
+            return accumulator.matches < workspaceProperties.maxGrepMatches();
+        });
 
-        return new SearchResult(lines, matches, skippedLargeFiles, skippedBinaryFiles);
+        return new SearchResult(
+                accumulator.lines,
+                accumulator.matches,
+                accumulator.skippedLargeFiles,
+                accumulator.skippedBinaryFiles);
     }
 
     private record SearchResult(
@@ -116,5 +119,12 @@ public class GrepTool implements AgentTool {
             int skippedLargeFiles,
             int skippedBinaryFiles
     ) {
+    }
+
+    private static final class SearchAccumulator {
+        private final List<String> lines = new ArrayList<>();
+        private int matches;
+        private int skippedLargeFiles;
+        private int skippedBinaryFiles;
     }
 }

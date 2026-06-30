@@ -75,6 +75,23 @@ class ReadToolTest {
         assertThat(result.metadata()).containsEntry("truncated", true);
     }
 
+    @Test
+    void readsNormalFileWhenWorkspaceParentMatchesDeniedPattern() throws Exception {
+        Path workspaceUnderSecretParent = Files.createDirectories(tempDir.resolve("secrets.parent").resolve("workspace"));
+        Files.writeString(workspaceUnderSecretParent.resolve("README.md"), "hello");
+        WorkspaceProperties workspaceProperties = new WorkspaceProperties(workspaceUnderSecretParent, 100, 200, 100);
+        ReadTool tool = new ReadTool(
+                new SafePathResolver(workspaceProperties),
+                new SecretFileGuard(),
+                workspaceProperties,
+                new ToolProperties(200));
+
+        ToolResult result = tool.execute(args("README.md"));
+
+        assertThat(result.error()).isFalse();
+        assertThat(result.text()).isEqualTo("hello");
+    }
+
     private ReadTool newTool(long maxReadBytes, int maxOutputChars) {
         WorkspaceProperties workspaceProperties = new WorkspaceProperties(workspace, maxReadBytes, 200, 100);
         return new ReadTool(

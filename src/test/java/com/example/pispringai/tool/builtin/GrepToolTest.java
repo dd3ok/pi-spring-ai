@@ -75,6 +75,15 @@ class GrepToolTest {
         assertThat(result.text()).contains("outside workspace");
     }
 
+    @Test
+    void returnsErrorWhenSearchRootIsSecretOrIgnoredDirectory() {
+        ToolResult gitResult = newTool(200, 100, 200).execute(args("AgentRuntime", ".git"));
+
+        assertThat(gitResult.error()).isTrue();
+        assertThat(gitResult.text()).contains("denied");
+        assertThat(gitResult.text()).doesNotContain("AgentRuntime");
+    }
+
     private GrepTool newTool(long maxReadBytes, int maxGrepMatches, int maxOutputChars) {
         WorkspaceProperties workspaceProperties = new WorkspaceProperties(workspace, maxReadBytes, 200, maxGrepMatches);
         return new GrepTool(

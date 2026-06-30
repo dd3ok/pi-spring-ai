@@ -7,8 +7,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 
 final class WorkspaceWalk {
@@ -16,8 +14,8 @@ final class WorkspaceWalk {
     private WorkspaceWalk() {
     }
 
-    static List<Path> regularFiles(Path root, SecretFileGuard secretFileGuard) throws IOException {
-        List<Path> files = new ArrayList<>();
+    static void walkRegularFiles(Path root, SecretFileGuard secretFileGuard, RegularFileVisitor visitor)
+            throws IOException {
         Files.walkFileTree(root, new SimpleFileVisitor<>() {
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
@@ -28,23 +26,33 @@ final class WorkspaceWalk {
             }
 
             @Override
-            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                 if (attrs.isRegularFile() && !shouldSkip(root, file, secretFileGuard)) {
-                    files.add(file);
+                    if (!visitor.visit(file)) {
+                        return FileVisitResult.TERMINATE;
+                    }
                 }
                 return FileVisitResult.CONTINUE;
             }
         });
-        return files;
     }
 
     static boolean shouldSkip(Path root, Path path, SecretFileGuard secretFileGuard) {
         Path relativePath = root.relativize(path);
-        return secretFileGuard.isDenied(relativePath) || hasIgnoredSegment(relativePath);
+        return shouldSkipRelative(relativePath, secretFileGuard);
+    }
+
+    static boolean shouldSkipRoot(Path workspaceRoot, Path root, SecretFileGuard secretFileGuard) {
+        Path relativePath = workspaceRoot.relativize(root);
+        return !relativePath.toString().isEmpty() && shouldSkipRelative(relativePath, secretFileGuard);
     }
 
     static String relativePath(Path root, Path path) {
         return root.relativize(path).toString().replace('\\', '/');
+    }
+
+    private static boolean shouldSkipRelative(Path relativePath, SecretFileGuard secretFileGuard) {
+        return secretFileGuard.isDenied(relativePath) || hasIgnoredSegment(relativePath);
     }
 
     private static boolean hasIgnoredSegment(Path path) {
@@ -55,5 +63,10 @@ final class WorkspaceWalk {
             }
         }
         return false;
+    }
+
+    @FunctionalInterface
+    interface RegularFileVisitor {
+        boolean visit(Path file) throws IOException;
     }
 }

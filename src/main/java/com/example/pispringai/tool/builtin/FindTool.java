@@ -13,7 +13,10 @@ import com.example.pispringai.workspace.WorkspaceAccessDeniedException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.springframework.stereotype.Component;
@@ -54,13 +57,20 @@ public class FindTool implements AgentTool {
             if (!Files.isDirectory(root)) {
                 return ToolResult.error("path is not a directory: " + root);
             }
+            if (WorkspaceWalk.shouldSkipRoot(pathResolver.workspaceRoot(), root, secretFileGuard)) {
+                return ToolResult.error("path is denied: " + root);
+            }
 
             GlobMatcher matcher = new GlobMatcher(pattern);
-            var matches = WorkspaceWalk.regularFiles(root, secretFileGuard).stream()
-                    .map(path -> WorkspaceWalk.relativePath(pathResolver.workspaceRoot(), path))
-                    .filter(relative -> matcher.matches(relative))
-                    .sorted()
-                    .toList();
+            List<String> matches = new ArrayList<>();
+            WorkspaceWalk.walkRegularFiles(root, secretFileGuard, path -> {
+                String relative = WorkspaceWalk.relativePath(pathResolver.workspaceRoot(), path);
+                if (matcher.matches(relative)) {
+                    matches.add(relative);
+                }
+                return true;
+            });
+            matches.sort(Comparator.naturalOrder());
 
             String text = String.join("\n", matches);
             Map<String, Object> metadata = new LinkedHashMap<>();
@@ -98,8 +108,13 @@ public class FindTool implements AgentTool {
                 char current = normalized.charAt(i);
                 if (current == '*') {
                     if (i + 1 < normalized.length() && normalized.charAt(i + 1) == '*') {
-                        regex.append(".*");
-                        i++;
+                        if (i + 2 < normalized.length() && normalized.charAt(i + 2) == '/') {
+                            regex.append("(?:.*/)?");
+                            i += 2;
+                        } else {
+                            regex.append(".*");
+                            i++;
+                        }
                     } else {
                         regex.append("[^/]*");
                     }

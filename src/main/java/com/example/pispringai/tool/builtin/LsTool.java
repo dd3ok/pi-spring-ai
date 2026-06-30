@@ -62,7 +62,7 @@ public class LsTool implements AgentTool {
             List<Path> entries;
             try (var stream = Files.list(directory)) {
                 entries = stream
-                        .filter(path -> !secretFileGuard.isDenied(path))
+                        .filter(path -> !secretFileGuard.isDenied(pathResolver.workspaceRoot().relativize(path)))
                         .sorted(Comparator.comparing(path -> path.getFileName().toString()))
                         .toList();
             }

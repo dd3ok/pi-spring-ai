@@ -74,6 +74,23 @@ class LsToolTest {
         assertThat(result.text()).contains("outside workspace");
     }
 
+    @Test
+    void listsNormalFilesWhenWorkspaceParentMatchesDeniedPattern() throws Exception {
+        Path workspaceUnderSecretParent = Files.createDirectories(tempDir.resolve("secrets.parent").resolve("workspace"));
+        Files.writeString(workspaceUnderSecretParent.resolve("README.md"), "hello");
+        WorkspaceProperties workspaceProperties = new WorkspaceProperties(workspaceUnderSecretParent, 200_000, 20, 100);
+        LsTool tool = new LsTool(
+                new SafePathResolver(workspaceProperties),
+                new SecretFileGuard(),
+                workspaceProperties,
+                new ToolProperties(200));
+
+        ToolResult result = tool.execute(args("."));
+
+        assertThat(result.error()).isFalse();
+        assertThat(result.text()).contains("README.md");
+    }
+
     private LsTool newTool(int maxDirectoryEntries, int maxOutputChars) {
         WorkspaceProperties workspaceProperties = new WorkspaceProperties(workspace, 200_000, maxDirectoryEntries, 100);
         return new LsTool(

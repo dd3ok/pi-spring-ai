@@ -26,6 +26,7 @@ class FindToolTest {
     void setUp() throws Exception {
         workspace = Files.createDirectory(tempDir.resolve("workspace"));
         Files.createDirectories(workspace.resolve("src/main"));
+        Files.writeString(workspace.resolve("src/App.java"), "class App {}");
         Files.writeString(workspace.resolve("src/main/App.java"), "class App {}");
         Files.writeString(workspace.resolve("src/main/AppTest.txt"), "not java");
         Files.writeString(workspace.resolve(".env"), "secret");
@@ -49,7 +50,7 @@ class FindToolTest {
         ToolResult result = newTool(100).execute(args("src/**/*.java", "."));
 
         assertThat(result.error()).isFalse();
-        assertThat(result.text()).contains("src/main/App.java");
+        assertThat(result.text()).contains("src/App.java", "src/main/App.java");
         assertThat(result.text()).doesNotContain("AppTest.txt");
     }
 
@@ -71,6 +72,19 @@ class FindToolTest {
 
         assertThat(result.error()).isTrue();
         assertThat(result.text()).contains("outside workspace");
+    }
+
+    @Test
+    void returnsErrorWhenSearchRootIsSecretOrIgnoredDirectory() {
+        ToolResult gitResult = newTool(100).execute(args("*", ".git"));
+        ToolResult buildResult = newTool(100).execute(args("*", "build"));
+
+        assertThat(gitResult.error()).isTrue();
+        assertThat(gitResult.text()).contains("denied");
+        assertThat(gitResult.text()).doesNotContain("config");
+        assertThat(buildResult.error()).isTrue();
+        assertThat(buildResult.text()).contains("denied");
+        assertThat(buildResult.text()).doesNotContain("Generated.java");
     }
 
     private FindTool newTool(int maxOutputChars) {

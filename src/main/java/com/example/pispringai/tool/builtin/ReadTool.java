@@ -54,7 +54,7 @@ public class ReadTool implements AgentTool {
     public ToolResult execute(ToolArguments arguments) {
         try {
             Path file = pathResolver.resolveExisting(arguments.requiredString("path"));
-            secretFileGuard.assertAllowed(file);
+            secretFileGuard.assertAllowed(pathResolver.workspaceRoot().relativize(file));
             if (!Files.isRegularFile(file)) {
                 return ToolResult.error("path is not a regular file: " + file);
             }
