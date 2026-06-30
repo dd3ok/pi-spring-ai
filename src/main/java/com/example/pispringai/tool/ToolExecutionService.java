@@ -18,11 +18,26 @@ public class ToolExecutionService {
     public ToolResult execute(AgentTool tool, ToolArguments arguments, ToolExecutionContext context) {
         ToolPolicyDecision decision = toolPolicy.before(tool, arguments, context);
         if (decision.denied()) {
-            ToolResult denied = ToolResult.error(decision.reason(), Map.of("policyDenied", true));
-            return toolPolicy.after(tool, arguments, denied, context);
+            return ToolResult.error(decision.reason(), Map.of("policyDenied", true));
         }
 
-        ToolResult result = tool.execute(arguments);
+        ToolResult result;
+        try {
+            result = tool.execute(arguments);
+        } catch (RuntimeException exception) {
+            result = ToolResult.error(
+                    "tool execution failed: " + exceptionMessage(exception),
+                    Map.of(
+                            "exception", exception.getClass().getName(),
+                            "exceptionMessage", exceptionMessage(exception)));
+        }
         return toolPolicy.after(tool, arguments, result, context);
+    }
+
+    private static String exceptionMessage(RuntimeException exception) {
+        String message = exception.getMessage();
+        return message == null || message.isBlank()
+                ? exception.getClass().getSimpleName()
+                : message;
     }
 }
