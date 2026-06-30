@@ -1,8 +1,10 @@
 package com.example.pispringai.tool;
 
+import com.example.pispringai.agent.AgentRunOptions;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -17,8 +19,13 @@ public class ToolRegistry {
     }
 
     public List<AgentTool> enabledTools() {
+        return enabledTools(AgentRunOptions.safeDefaults());
+    }
+
+    public List<AgentTool> enabledTools(AgentRunOptions options) {
+        Objects.requireNonNull(options, "options must not be null");
         return tools.stream()
-                .filter(tool -> tool.spec().enabledByDefault())
+                .filter(tool -> isEnabled(tool.spec(), options))
                 .toList();
     }
 
@@ -39,5 +46,13 @@ public class ToolRegistry {
             }
         }
         return Map.copyOf(indexed);
+    }
+
+    private static boolean isEnabled(ToolSpec spec, AgentRunOptions options) {
+        return switch (spec.safetyLevel()) {
+            case READ_ONLY -> spec.enabledByDefault();
+            case WRITE -> options.allowWrite();
+            case BASH -> options.allowBash();
+        };
     }
 }
