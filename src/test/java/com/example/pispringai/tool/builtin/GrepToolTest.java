@@ -31,6 +31,8 @@ class GrepToolTest {
         Files.writeString(workspace.resolve(".env"), "AgentRuntime=secret\n");
         Files.createDirectories(workspace.resolve(".git"));
         Files.writeString(workspace.resolve(".git/config"), "AgentRuntime");
+        Files.createDirectories(workspace.resolve("build"));
+        Files.writeString(workspace.resolve("build/Generated.txt"), "AgentRuntime");
         Files.write(workspace.resolve("binary.bin"), new byte[] {'A', 0, 'B'});
         Files.writeString(workspace.resolve("large.txt"), "large text without query");
     }
@@ -65,6 +67,27 @@ class GrepToolTest {
     }
 
     @Test
+    void keepsCountingSkippedFilesAfterMaxMatches() throws Exception {
+        Path cappedWorkspace = Files.createDirectory(tempDir.resolve("capped-workspace"));
+        Files.writeString(cappedWorkspace.resolve("00-match.txt"), "hit");
+        Files.write(cappedWorkspace.resolve("01-binary.bin"), new byte[] {'A', 0, 'B'});
+        Files.writeString(cappedWorkspace.resolve("02-large.txt"), "abcdef");
+        WorkspaceProperties workspaceProperties = new WorkspaceProperties(cappedWorkspace, 3, 200, 1);
+        GrepTool tool = new GrepTool(
+                new SafePathResolver(workspaceProperties),
+                new SecretFileGuard(),
+                workspaceProperties,
+                new ToolProperties(200));
+
+        ToolResult result = tool.execute(args("hit", "."));
+
+        assertThat(result.error()).isFalse();
+        assertThat(result.metadata()).containsEntry("matches", 1);
+        assertThat(result.metadata()).containsEntry("skippedBinaryFiles", 1);
+        assertThat(result.metadata()).containsEntry("skippedLargeFiles", 1);
+    }
+
+    @Test
     void returnsErrorForTraversalOutsideWorkspace() throws Exception {
         Path outside = Files.createDirectory(tempDir.resolve("outside"));
         Files.writeString(outside.resolve("outside.txt"), "AgentRuntime");
@@ -78,10 +101,14 @@ class GrepToolTest {
     @Test
     void returnsErrorWhenSearchRootIsSecretOrIgnoredDirectory() {
         ToolResult gitResult = newTool(200, 100, 200).execute(args("AgentRuntime", ".git"));
+        ToolResult buildResult = newTool(200, 100, 200).execute(args("AgentRuntime", "build"));
 
         assertThat(gitResult.error()).isTrue();
         assertThat(gitResult.text()).contains("denied");
         assertThat(gitResult.text()).doesNotContain("AgentRuntime");
+        assertThat(buildResult.error()).isTrue();
+        assertThat(buildResult.text()).contains("denied");
+        assertThat(buildResult.text()).doesNotContain("AgentRuntime");
     }
 
     private GrepTool newTool(long maxReadBytes, int maxGrepMatches, int maxOutputChars) {

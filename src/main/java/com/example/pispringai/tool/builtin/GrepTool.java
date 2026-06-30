@@ -93,6 +93,10 @@ public class GrepTool implements AgentTool {
                 return true;
             }
 
+            if (accumulator.matches >= workspaceProperties.maxGrepMatches()) {
+                return true;
+            }
+
             String relative = WorkspaceWalk.relativePath(pathResolver.workspaceRoot(), file);
             String[] fileLines = text.split("\\R", -1);
             for (int index = 0; index < fileLines.length
@@ -103,7 +107,7 @@ public class GrepTool implements AgentTool {
                     accumulator.matches++;
                 }
             }
-            return accumulator.matches < workspaceProperties.maxGrepMatches();
+            return true;
         });
 
         return new SearchResult(
