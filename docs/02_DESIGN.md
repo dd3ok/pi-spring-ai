@@ -78,6 +78,11 @@ public interface AgentTool {
 }
 ```
 
+단계별 구현에서는 이 계약을 한 번에 완성하지 않는다. M5에서는 아직 `ToolExecutionContext`,
+`ToolPolicy`, `ToolExecutionService`가 없으므로 `execute(ToolArguments arguments)`처럼 더 작은
+계약으로 시작해도 된다. M6에서 공통 실행 정책을 붙일 때 context를 추가하거나, executor가
+context를 들고 tool은 단순 계약을 유지하는 방식으로 확장한다.
+
 Spring AI에 넘길 때만 `ToolCallback` 또는 `@Tool` adapter로 감싼다.
 
 이유:
@@ -397,6 +402,9 @@ public class ToolRegistry {
 }
 ```
 
+M5에서는 read-only 도구만 존재하므로 `enabledTools()`처럼 옵션 없는 단순 형태로 시작해도 된다.
+`allowWrite`, `allowBash` 기반 활성화는 M6 이후 write/bash 계층이 생길 때 붙인다.
+
 활성화 규칙:
 
 ```text
@@ -458,6 +466,7 @@ MVP 정책:
 - workspace root 기준 path resolve
 - 디렉터리 목록 반환
 - 최대 항목 수 제한
+- secret entry는 목록에서 제외
 
 #### ReadTool
 
@@ -472,6 +481,7 @@ MVP 정책:
 - 텍스트 파일만 읽기
 - 최대 byte 수 제한
 - secret 파일 차단
+- UTF-8 decode 실패 또는 NUL byte 포함 파일은 binary로 보고 실패
 
 #### FindTool
 
@@ -485,6 +495,8 @@ MVP 정책:
 
 - workspace 내부 파일명 검색
 - `.git`, `build`, `.gradle` 기본 제외
+- secret path는 결과에서 제외
+- M5에서는 glob 기반으로 시작한다. `*.java`는 파일명 기준 매칭, `src/**/*.java`는 상대 경로 기준 매칭으로 테스트에 고정한다.
 
 #### GrepTool
 
@@ -498,6 +510,13 @@ MVP 정책:
 
 - 텍스트 파일만 검색
 - 최대 match 수 제한
+- secret 파일은 검색하지 않는다
+- large/binary 파일은 실패가 아니라 skip하고 metadata에 skip count를 남긴다
+- M5에서는 regex가 아니라 literal substring 검색으로 시작한다
+
+M5의 도구 내부 제한과 M6의 공통 정책은 역할이 다르다. M5 도구는 스스로 `SafePathResolver`,
+`SecretFileGuard`, read/list/grep 제한, `max-tool-output-chars`를 적용한다. M6에서는 모든 도구
+결과를 공통 `ToolPolicy`/`ToolExecutionService`로 한 번 더 감싼다.
 
 #### WriteTool
 
@@ -853,6 +872,7 @@ agent:
 - `SecretFileGuardTest`
 - `ReadToolTest`
 - `LsToolTest`
+- `FindToolTest`
 - `GrepToolTest`
 - `JsonlSessionStoreTest`
 - `ToolPolicyTest`

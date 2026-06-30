@@ -283,6 +283,8 @@ src/test/java/.../workspace/SecretFileGuardTest.java
 
 - `AgentTool` interface
 - `ToolSpec`, `ToolArguments`, `ToolResult`
+- `ToolSafetyLevel` 또는 read-only 여부를 표현하는 최소 타입
+- `ToolProperties` (`agent.tools.max-tool-output-chars`)
 - `LsTool`
 - `ReadTool`
 - `FindTool`
@@ -296,25 +298,41 @@ src/main/java/.../tool/AgentTool.java
 src/main/java/.../tool/ToolSpec.java
 src/main/java/.../tool/ToolArguments.java
 src/main/java/.../tool/ToolResult.java
+src/main/java/.../tool/ToolSafetyLevel.java
+src/main/java/.../tool/ToolProperties.java
 src/main/java/.../tool/ToolRegistry.java
 src/main/java/.../tool/builtin/LsTool.java
 src/main/java/.../tool/builtin/ReadTool.java
 src/main/java/.../tool/builtin/FindTool.java
 src/main/java/.../tool/builtin/GrepTool.java
+src/test/java/.../tool/ToolArgumentsTest.java
+src/test/java/.../tool/ToolRegistryTest.java
+src/test/java/.../tool/builtin/LsToolTest.java
 src/test/java/.../tool/builtin/ReadToolTest.java
+src/test/java/.../tool/builtin/FindToolTest.java
 src/test/java/.../tool/builtin/GrepToolTest.java
 ```
 
 ### 완료 조건
 
 - read/ls/find/grep 테스트 통과
+- 모든 파일 경로가 `SafePathResolver.resolveExisting()`을 통과
+- `SecretFileGuard`가 read뿐 아니라 ls/find/grep 결과에도 적용
 - secret 파일 read 실패
-- output limit 적용
+- ls/find/grep 결과에서 secret path 제외
+- read는 UTF-8 텍스트 파일만 허용하고 large/binary file은 실패
+- grep은 large/binary file을 skip하고 metadata에 skip count 기록
+- read/list/grep 개별 제한과 `max-tool-output-chars` output limit 적용
 - large file 처리 테스트
 
 ### 주의
 
 - write/edit/bash 구현하지 않는다.
+- `ToolPolicy`, `ToolPolicyDecision`, `DefaultToolPolicy`, `ToolExecutionContext`, `ToolExecutionService`는 M6로 남긴다.
+- Spring AI adapter를 구현하지 않는다.
+- M5의 `AgentTool`은 `execute(ToolArguments arguments)`처럼 context 없는 작은 계약으로 시작해도 된다.
+- `FindTool`은 glob 기반으로 시작한다. `*.java`는 파일명 기준 매칭, `src/**/*.java`는 상대 경로 기준 매칭으로 테스트에 고정한다.
+- `GrepTool`은 regex가 아니라 literal substring 검색으로 시작한다.
 
 ---
 

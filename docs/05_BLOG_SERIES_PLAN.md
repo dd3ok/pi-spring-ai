@@ -117,3 +117,24 @@ M3 구현 메모:
 - 알 수 없는 `kind`/`type`은 조용히 무시하지 말고 실패시킨다.
 - `kind`/`type` 누락, 문자열이 아닌 discriminator, malformed JSONL, 손상된 `session.json`, sessionId path traversal도 테스트로 고정한다.
 - M3에서는 API, SSE, AgentRuntime, Tool을 연결하지 않는다.
+
+### M5 Read-only tools
+
+핵심 질문은 다음과 같다.
+
+- 왜 `ToolPolicy`보다 `ls`, `read`, `find`, `grep` 도구를 먼저 작게 만드는가?
+- 왜 M5 도구도 `SafePathResolver`와 `SecretFileGuard`를 직접 통과해야 하는가?
+- 왜 `grep`은 regex가 아니라 literal substring 검색으로 시작하는가?
+
+M5 구현 메모:
+
+- M5는 도구 모델과 읽기 전용 built-in tool을 만드는 단계다.
+- `ToolPolicy`, `ToolExecutionService`, `ToolExecutionContext`는 M6로 남긴다.
+- `AgentTool`은 context 없는 작은 `execute(ToolArguments)` 계약으로 시작해도 된다.
+- 각 도구는 공통 policy가 생기기 전에도 스스로 안전해야 한다.
+- 모든 경로는 `SafePathResolver.resolveExisting()`을 통과한다.
+- `SecretFileGuard`는 read 차단뿐 아니라 `ls`, `find`, `grep` 결과 필터링에도 적용한다.
+- `ReadTool`은 UTF-8 텍스트 파일만 읽고 large/binary file은 실패시킨다.
+- `FindTool`은 glob 기반으로 시작한다.
+- `GrepTool`은 literal substring 검색으로 시작하고 large/binary file은 skip한다.
+- M5의 output limit은 도구 내부 안전장치이고, M6의 output truncation은 공통 실행 정책으로 한 번 더 적용한다.
