@@ -246,6 +246,8 @@ Task M5만 구현해줘.
 - ToolSpec
 - ToolArguments
 - ToolResult
+- ToolSafetyLevel 또는 read-only 여부를 표현하는 최소 타입
+- ToolProperties (`agent.tools.max-tool-output-chars`)
 - ToolRegistry
 - LsTool
 - ReadTool
@@ -257,15 +259,32 @@ Task M5만 구현해줘.
 - SecretFileGuard를 적용해야 함
 - 출력 길이를 제한해야 함
 - .git, build, .gradle은 검색 기본 제외
+- read는 UTF-8 텍스트 파일만 허용하고 large/binary file은 실패
+- ls/find/grep 결과에서는 secret path를 제외
+- grep은 large/binary file을 skip하고 metadata에 skip count를 남김
+- find는 glob 기반으로 시작함
+- grep은 regex가 아니라 literal substring 검색으로 시작함
 
 하지 말 것:
 - write/edit/bash 구현하지 마
+- ToolPolicy, ToolPolicyDecision, DefaultToolPolicy 구현하지 마
+- ToolExecutionContext, ToolExecutionService 구현하지 마
 - Spring AI adapter 구현하지 마
+
+구현 결정:
+- M5의 AgentTool은 context 없는 `execute(ToolArguments arguments)` 계약으로 시작해도 됨.
+- ToolExecutionContext는 M6에서 공통 실행 정책을 붙일 때 도입한다.
+- ToolRegistry는 read-only tool만 다루므로 options 없는 `enabledTools()` 형태로 시작해도 됨.
+- `allowWrite`, `allowBash` 기반 tool 활성화는 M6 이후로 미룬다.
+- `*.java`는 파일명 기준 매칭, `src/**/*.java`는 workspace 상대 경로 기준 매칭으로 테스트에 고정한다.
+- M5 도구 내부 제한과 M6 공통 policy는 별개다. M5에서는 각 도구가 스스로 path/secret/size/output 제한을 지킨다.
 
 완료 조건:
 - read/ls/find/grep 테스트
 - secret 파일 read 실패 테스트
 - output limit 테스트
+- large/binary file 처리 테스트
+- ls/find/grep에서 secret path 제외 테스트
 - ./gradlew test 통과
 ```
 

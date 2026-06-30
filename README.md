@@ -49,7 +49,7 @@ and replayable sessions for Java/Spring developers.
 
 ## Current Status
 
-현재는 `M4 Workspace guard` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
+현재는 `M5 Read-only tools` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
 
 M2에서는 아직 LLM tool calling, session store, AgentRuntime을 붙이지 않고 AgentRuntime 구현 전에 필요한 순수 도메인 타입만 추가했다.
 
@@ -85,7 +85,17 @@ M4에서는 아직 read/ls/find/grep 도구를 만들지 않고, 앞으로 파�
 - Spring AI Google GenAI starter: Gemini를 기본 chat provider로 쓰기 위한 model starter
 - Spring AI OpenAI starter: OpenAI provider 전환 예제를 유지하기 위한 model starter
 
-아직 read-only tools, AgentRuntime, tool calling은 구현하지 않았다. 이들은 M5 이후 단계에서 순서대로 붙인다.
+M5에서는 Spring AI Tool Calling에 연결하지 않고, 내부 read-only built-in tools만 추가했다.
+
+- `AgentTool`: 내부 도구의 최소 계약. M5에서는 `execute(ToolArguments)` 형태로 시작
+- `ToolSpec`, `ToolArguments`, `ToolResult`: 도구 설명, 입력, 결과 모델
+- `ToolRegistry`: 등록된 read-only 도구 조회
+- `LsTool`: workspace 내부 디렉터리 목록. secret entry 제외, 항목 수와 출력 길이 제한
+- `ReadTool`: workspace 내부 UTF-8 텍스트 파일 읽기. secret, traversal, large/binary file 차단
+- `FindTool`: workspace 내부 파일 glob 검색. `.git`, `build`, `.gradle`, secret path 제외
+- `GrepTool`: workspace 내부 텍스트 파일 literal substring 검색. secret 제외, large/binary file skip
+
+아직 AgentRuntime, ToolPolicy/ToolExecutionService, Spring AI tool adapter는 구현하지 않았다. 이들은 M6 이후 단계에서 순서대로 붙인다.
 
 ## Run
 
@@ -137,4 +147,4 @@ Invoke-RestMethod `
 {"content":"..."}
 ```
 
-다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M5` 프롬프트를 기준으로 시작한다.
+다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M6` 프롬프트를 기준으로 시작한다.
