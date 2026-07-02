@@ -19,8 +19,10 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
+import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class SpringAiToolCallbackAdapterTest {
 
@@ -102,6 +104,29 @@ class SpringAiToolCallbackAdapterTest {
     }
 
     @Test
+    void nullExecutionResultReturnsErrorResultToModel() throws Exception {
+        AgentTool tool = new StubTool("read");
+        RecordingToolExecutionService executionService = new RecordingToolExecutionService(null);
+        RecordingCallbackEvents events = new RecordingCallbackEvents();
+        ToolCallback callback = new SpringAiToolCallbackAdapter(
+                tool,
+                executionService,
+                AgentRunOptions.safeDefaults(),
+                objectMapper,
+                events);
+
+        String rawResult = callback.call("{\"path\":\"README.md\"}");
+
+        JsonNode result = objectMapper.readTree(rawResult);
+        assertThat(result.path("error").asBoolean()).isTrue();
+        assertThat(result.path("text").asText()).contains("no result");
+        assertThat(events.startedCount()).isEqualTo(1);
+        assertThat(events.finishedCount()).isEqualTo(1);
+        assertThat(events.deniedCount()).isZero();
+        assertThat(events.finishedResult().error()).isTrue();
+    }
+
+    @Test
     void malformedArgumentsReturnErrorResultWithoutExecutingTool() throws Exception {
         AgentTool tool = new StubTool("read");
         RecordingToolExecutionService executionService = new RecordingToolExecutionService(ToolResult.ok("unused"));
@@ -122,6 +147,21 @@ class SpringAiToolCallbackAdapterTest {
         assertThat(events.startedCount()).isZero();
         assertThat(events.finishedCount()).isZero();
         assertThat(events.deniedCount()).isZero();
+    }
+
+    @Test
+    void rejectsAgentToolWithoutSpec() {
+        AgentTool tool = new NullSpecTool();
+        RecordingToolExecutionService executionService = new RecordingToolExecutionService(ToolResult.ok("unused"));
+
+        assertThatThrownBy(() -> new SpringAiToolCallbackAdapter(
+                tool,
+                executionService,
+                AgentRunOptions.safeDefaults(),
+                objectMapper,
+                SpringAiToolCallbackEvents.noop()))
+                .isInstanceOf(NullPointerException.class)
+                .hasMessageContaining("tool spec");
     }
 
     @Test
@@ -152,6 +192,22 @@ class SpringAiToolCallbackAdapterTest {
                 .containsExactly("read");
     }
 
+    @Test
+    void factoryFallsBackToNoopEventsWhenProviderIsNull() {
+        AgentTool read = new StubTool("read");
+        ToolRegistry registry = new ToolRegistry(List.of(read));
+        RecordingToolExecutionService executionService = new RecordingToolExecutionService(ToolResult.ok("ok"));
+        SpringAiToolCallbackFactory factory = new SpringAiToolCallbackFactory(
+                registry,
+                executionService,
+                objectMapper,
+                (ObjectProvider<SpringAiToolCallbackEvents>) null);
+
+        assertThat(factory.callbacksFor(AgentRunOptions.safeDefaults()))
+                .extracting(callback -> callback.getToolDefinition().name())
+                .containsExactly("read");
+    }
+
     private record StubTool(
             String name,
             String description,
@@ -176,6 +232,19 @@ class SpringAiToolCallbackAdapterTest {
         @Override
         public ToolResult execute(ToolArguments arguments) {
             return ToolResult.ok("direct execution should not be used in this test");
+        }
+    }
+
+    private static final class NullSpecTool implements AgentTool {
+
+        @Override
+        public ToolSpec spec() {
+            return null;
+        }
+
+        @Override
+        public ToolResult execute(ToolArguments arguments) {
+            return ToolResult.ok("unused");
         }
     }
 
@@ -223,6 +292,7 @@ class SpringAiToolCallbackAdapterTest {
         private int startedCount;
         private int finishedCount;
         private int deniedCount;
+        private ToolResult finishedResult;
 
         @Override
         public void toolCallStarted(String toolName, ToolArguments arguments) {
@@ -232,6 +302,7 @@ class SpringAiToolCallbackAdapterTest {
         @Override
         public void toolCallFinished(String toolName, ToolResult result) {
             finishedCount++;
+            finishedResult = result;
         }
 
         @Override
@@ -249,6 +320,10 @@ class SpringAiToolCallbackAdapterTest {
 
         private int deniedCount() {
             return deniedCount;
+        }
+
+        private ToolResult finishedResult() {
+            return finishedResult;
         }
     }
 

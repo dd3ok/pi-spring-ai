@@ -31,7 +31,9 @@ public class SpringAiToolCallbackFactory {
                 toolRegistry,
                 toolExecutionService,
                 objectMapper,
-                events.getIfAvailable(SpringAiToolCallbackEvents::noop));
+                events == null
+                        ? SpringAiToolCallbackEvents.noop()
+                        : events.getIfAvailable(SpringAiToolCallbackEvents::noop));
     }
 
     SpringAiToolCallbackFactory(

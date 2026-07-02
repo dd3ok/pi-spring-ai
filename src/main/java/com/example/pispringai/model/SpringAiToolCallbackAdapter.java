@@ -23,6 +23,7 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
     };
 
     private final AgentTool tool;
+    private final ToolSpec spec;
     private final ToolExecutionService toolExecutionService;
     private final ToolExecutionContext context;
     private final ObjectMapper objectMapper;
@@ -37,13 +38,14 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
             SpringAiToolCallbackEvents events
     ) {
         this.tool = Objects.requireNonNull(tool, "tool must not be null");
+        this.spec = Objects.requireNonNull(tool.spec(), "tool spec must not be null");
         this.toolExecutionService = Objects.requireNonNull(
                 toolExecutionService,
                 "toolExecutionService must not be null");
         this.context = new ToolExecutionContext(Objects.requireNonNull(options, "options must not be null"));
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.events = Objects.requireNonNull(events, "events must not be null");
-        this.toolDefinition = toToolDefinition(tool.spec());
+        this.toolDefinition = toToolDefinition(spec);
     }
 
     @Override
@@ -60,12 +62,12 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
             return serializeResult(ToolResult.error("invalid tool arguments: " + exceptionMessage(exception)));
         }
 
-        events.toolCallStarted(tool.spec().name(), arguments);
-        ToolResult result = toolExecutionService.execute(tool, arguments, context);
+        events.toolCallStarted(spec.name(), arguments);
+        ToolResult result = normalizeResult(toolExecutionService.execute(tool, arguments, context));
         if (isPolicyDenied(result)) {
-            events.toolCallDenied(tool.spec().name(), result);
+            events.toolCallDenied(spec.name(), result);
         } else {
-            events.toolCallFinished(tool.spec().name(), result);
+            events.toolCallFinished(spec.name(), result);
         }
         return serializeResult(result);
     }
@@ -90,7 +92,7 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
         try {
             return objectMapper.writeValueAsString(schema);
         } catch (JsonProcessingException exception) {
-            throw new IllegalArgumentException("invalid tool input schema for " + tool.spec().name(), exception);
+            throw new IllegalArgumentException("invalid tool input schema for " + spec.name(), exception);
         }
     }
 
@@ -118,6 +120,7 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
     }
 
     private String serializeResult(ToolResult result) {
+        result = normalizeResult(result);
         try {
             return objectMapper.writeValueAsString(result);
         } catch (JsonProcessingException exception) {
@@ -125,8 +128,14 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
         }
     }
 
+    private static ToolResult normalizeResult(ToolResult result) {
+        return result == null
+                ? ToolResult.error("tool execution returned no result")
+                : result;
+    }
+
     private static boolean isPolicyDenied(ToolResult result) {
-        return Boolean.TRUE.equals(result.metadata().get("policyDenied"));
+        return result != null && Boolean.TRUE.equals(result.metadata().get("policyDenied"));
     }
 
     private static String exceptionMessage(Exception exception) {
