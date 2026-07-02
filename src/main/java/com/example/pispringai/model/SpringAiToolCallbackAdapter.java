@@ -59,7 +59,9 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
         try {
             arguments = parseArguments(toolInput);
         } catch (RuntimeException exception) {
-            return serializeResult(ToolResult.error("invalid tool arguments: " + exceptionMessage(exception)));
+            ToolResult result = ToolResult.error("invalid tool arguments: " + exceptionMessage(exception));
+            events.toolCallFailed(spec.name(), result);
+            return serializeResult(result);
         }
 
         events.toolCallStarted(spec.name(), arguments);

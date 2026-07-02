@@ -147,6 +147,8 @@ class SpringAiToolCallbackAdapterTest {
         assertThat(events.startedCount()).isZero();
         assertThat(events.finishedCount()).isZero();
         assertThat(events.deniedCount()).isZero();
+        assertThat(events.failedCount()).isEqualTo(1);
+        assertThat(events.failedResult().error()).isTrue();
     }
 
     @Test
@@ -292,7 +294,9 @@ class SpringAiToolCallbackAdapterTest {
         private int startedCount;
         private int finishedCount;
         private int deniedCount;
+        private int failedCount;
         private ToolResult finishedResult;
+        private ToolResult failedResult;
 
         @Override
         public void toolCallStarted(String toolName, ToolArguments arguments) {
@@ -310,6 +314,12 @@ class SpringAiToolCallbackAdapterTest {
             deniedCount++;
         }
 
+        @Override
+        public void toolCallFailed(String toolName, ToolResult result) {
+            failedCount++;
+            failedResult = result;
+        }
+
         private int startedCount() {
             return startedCount;
         }
@@ -322,8 +332,16 @@ class SpringAiToolCallbackAdapterTest {
             return deniedCount;
         }
 
+        private int failedCount() {
+            return failedCount;
+        }
+
         private ToolResult finishedResult() {
             return finishedResult;
+        }
+
+        private ToolResult failedResult() {
+            return failedResult;
         }
     }
 

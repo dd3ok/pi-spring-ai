@@ -18,4 +18,7 @@ public interface SpringAiToolCallbackEvents {
 
     default void toolCallDenied(String toolName, ToolResult result) {
     }
+
+    default void toolCallFailed(String toolName, ToolResult result) {
+    }
 }
