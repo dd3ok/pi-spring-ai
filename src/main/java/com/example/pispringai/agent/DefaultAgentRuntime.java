@@ -56,7 +56,7 @@ public class DefaultAgentRuntime implements AgentRuntime {
         SpringAiToolCallbackEvents toolEvents = new RuntimeToolCallbackEvents(command.sessionId(), state, emitter);
 
         try {
-            emit(command.sessionId(), emitter, new AgentStartedEvent(
+            emit(command.sessionId(), state, emitter, new AgentStartedEvent(
                     IdGenerator.eventId(),
                     command.sessionId(),
                     Instant.now()));
@@ -67,29 +67,32 @@ public class DefaultAgentRuntime implements AgentRuntime {
                     null,
                     Instant.now(),
                     command.userText());
-            sessionStore.appendMessage(command.sessionId(), userMessage);
-            state.updateLastMessageId(userMessage.id());
-            emit(command.sessionId(), emitter, new UserMessageAppendedEvent(
-                    IdGenerator.eventId(),
-                    command.sessionId(),
-                    Instant.now(),
-                    userMessage.id()));
+            synchronized (state) {
+                sessionStore.appendMessage(command.sessionId(), userMessage);
+                state.updateLastMessageId(userMessage.id());
+                appendEvent(command.sessionId(), emitter, new UserMessageAppendedEvent(
+                        IdGenerator.eventId(),
+                        command.sessionId(),
+                        Instant.now(),
+                        userMessage.id()));
+            }
 
             Flux<String> modelStream = Objects.requireNonNull(
                     modelClient.streamText(command, toolEvents),
                     "model stream must not be null");
             Disposable disposable = modelStream.subscribe(
-                    text -> appendAssistantDelta(command.sessionId(), assistantText, emitter, text),
-                    error -> completeWithError(command.sessionId(), emitter, finished, error),
+                    text -> appendAssistantDelta(command.sessionId(), state, assistantText, emitter, text),
+                    error -> completeWithError(command.sessionId(), state, emitter, finished, error),
                     () -> completeSuccessfully(command.sessionId(), emitter, state, assistantText, finished));
             emitter.onDispose(disposable);
         } catch (RuntimeException exception) {
-            completeWithError(command.sessionId(), emitter, finished, exception);
+            completeWithError(command.sessionId(), state, emitter, finished, exception);
         }
     }
 
     private void appendAssistantDelta(
             String sessionId,
+            RunState state,
             StringBuilder assistantText,
             FluxSink<AgentEvent> emitter,
             String text
@@ -97,8 +100,10 @@ public class DefaultAgentRuntime implements AgentRuntime {
         if (text == null) {
             return;
         }
-        assistantText.append(text);
-        emit(sessionId, emitter, new AssistantDeltaEvent(IdGenerator.eventId(), sessionId, Instant.now(), text));
+        synchronized (state) {
+            assistantText.append(text);
+            appendEvent(sessionId, emitter, new AssistantDeltaEvent(IdGenerator.eventId(), sessionId, Instant.now(), text));
+        }
     }
 
     private void completeSuccessfully(
@@ -111,26 +116,29 @@ public class DefaultAgentRuntime implements AgentRuntime {
         if (!finished.compareAndSet(false, true)) {
             return;
         }
-        AssistantMessage assistantMessage = new AssistantMessage(
-                IdGenerator.messageId(),
-                sessionId,
-                state.lastMessageId(),
-                Instant.now(),
-                assistantText.toString(),
-                AssistantStopReason.STOP);
-        sessionStore.appendMessage(sessionId, assistantMessage);
-        state.updateLastMessageId(assistantMessage.id());
-        emit(sessionId, emitter, new AssistantCompletedEvent(
-                IdGenerator.eventId(),
-                sessionId,
-                Instant.now(),
-                assistantMessage.id()));
-        emit(sessionId, emitter, new AgentCompletedEvent(IdGenerator.eventId(), sessionId, Instant.now()));
-        emitter.complete();
+        synchronized (state) {
+            AssistantMessage assistantMessage = new AssistantMessage(
+                    IdGenerator.messageId(),
+                    sessionId,
+                    state.lastMessageId(),
+                    Instant.now(),
+                    assistantText.toString(),
+                    AssistantStopReason.STOP);
+            sessionStore.appendMessage(sessionId, assistantMessage);
+            state.updateLastMessageId(assistantMessage.id());
+            appendEvent(sessionId, emitter, new AssistantCompletedEvent(
+                    IdGenerator.eventId(),
+                    sessionId,
+                    Instant.now(),
+                    assistantMessage.id()));
+            appendEvent(sessionId, emitter, new AgentCompletedEvent(IdGenerator.eventId(), sessionId, Instant.now()));
+            emitter.complete();
+        }
     }
 
     private void completeWithError(
             String sessionId,
+            RunState state,
             FluxSink<AgentEvent> emitter,
             AtomicBoolean finished,
             Throwable error
@@ -139,15 +147,17 @@ public class DefaultAgentRuntime implements AgentRuntime {
             return;
         }
         try {
-            emit(sessionId, emitter, new AgentErrorEvent(
-                    IdGenerator.eventId(),
-                    sessionId,
-                    Instant.now(),
-                    errorMessage(error),
-                    "MODEL_ERROR",
-                    false));
-            emit(sessionId, emitter, new AgentCompletedEvent(IdGenerator.eventId(), sessionId, Instant.now()));
-            emitter.complete();
+            synchronized (state) {
+                appendEvent(sessionId, emitter, new AgentErrorEvent(
+                        IdGenerator.eventId(),
+                        sessionId,
+                        Instant.now(),
+                        errorMessage(error),
+                        "MODEL_ERROR",
+                        false));
+                appendEvent(sessionId, emitter, new AgentCompletedEvent(IdGenerator.eventId(), sessionId, Instant.now()));
+                emitter.complete();
+            }
         } catch (RuntimeException appendFailure) {
             emitter.error(appendFailure);
         }
@@ -167,7 +177,13 @@ public class DefaultAgentRuntime implements AgentRuntime {
         state.updateLastMessageId(message.id());
     }
 
-    private void emit(String sessionId, FluxSink<AgentEvent> emitter, AgentEvent event) {
+    private void emit(String sessionId, RunState state, FluxSink<AgentEvent> emitter, AgentEvent event) {
+        synchronized (state) {
+            appendEvent(sessionId, emitter, event);
+        }
+    }
+
+    private void appendEvent(String sessionId, FluxSink<AgentEvent> emitter, AgentEvent event) {
         sessionStore.appendEvent(sessionId, event);
         emitter.next(event);
     }
@@ -200,52 +216,79 @@ public class DefaultAgentRuntime implements AgentRuntime {
         @Override
         public void toolCallStarted(String toolName, ToolArguments arguments) {
             String callId = state.startToolCall(toolName);
-            emit(sessionId, emitter, new ToolCallStartedEvent(
+            toolCallStarted(callId, toolName, arguments);
+        }
+
+        @Override
+        public void toolCallStarted(String toolCallId, String toolName, ToolArguments arguments) {
+            emit(sessionId, state, emitter, new ToolCallStartedEvent(
                     IdGenerator.eventId(),
                     sessionId,
                     Instant.now(),
-                    callId,
+                    toolCallId,
                     toolName));
         }
 
         @Override
         public void toolCallFinished(String toolName, ToolResult result) {
-            ToolResult normalized = normalizeResult(result);
             String callId = state.finishToolCall(toolName);
-            appendToolResult(sessionId, state, callId, toolName, normalized);
-            emit(sessionId, emitter, new ToolCallFinishedEvent(
-                    IdGenerator.eventId(),
-                    sessionId,
-                    Instant.now(),
-                    callId,
-                    toolName,
-                    normalized.error()));
+            toolCallFinished(callId, toolName, result);
+        }
+
+        @Override
+        public void toolCallFinished(String toolCallId, String toolName, ToolResult result) {
+            ToolResult normalized = normalizeResult(result);
+            synchronized (state) {
+                appendToolResult(sessionId, state, toolCallId, toolName, normalized);
+                appendEvent(sessionId, emitter, new ToolCallFinishedEvent(
+                        IdGenerator.eventId(),
+                        sessionId,
+                        Instant.now(),
+                        toolCallId,
+                        toolName,
+                        normalized.error()));
+            }
         }
 
         @Override
         public void toolCallDenied(String toolName, ToolResult result) {
-            ToolResult normalized = normalizeResult(result);
             String callId = state.finishToolCall(toolName);
-            appendToolResult(sessionId, state, callId, toolName, normalized);
-            emit(sessionId, emitter, new ToolCallDeniedEvent(
-                    IdGenerator.eventId(),
-                    sessionId,
-                    Instant.now(),
-                    callId,
-                    toolName,
-                    normalized.text()));
+            toolCallDenied(callId, toolName, result);
+        }
+
+        @Override
+        public void toolCallDenied(String toolCallId, String toolName, ToolResult result) {
+            ToolResult normalized = normalizeResult(result);
+            synchronized (state) {
+                appendToolResult(sessionId, state, toolCallId, toolName, normalized);
+                appendEvent(sessionId, emitter, new ToolCallDeniedEvent(
+                        IdGenerator.eventId(),
+                        sessionId,
+                        Instant.now(),
+                        toolCallId,
+                        toolName,
+                        normalized.text()));
+            }
         }
 
         @Override
         public void toolCallFailed(String toolName, ToolResult result) {
+            toolCallFailed(IdGenerator.toolCallId(), toolName, result);
+        }
+
+        @Override
+        public void toolCallFailed(String toolCallId, String toolName, ToolResult result) {
             ToolResult normalized = normalizeResult(result);
-            emit(sessionId, emitter, new AgentErrorEvent(
-                    IdGenerator.eventId(),
-                    sessionId,
-                    Instant.now(),
-                    toolName + ": " + normalized.text(),
-                    "TOOL_CALL_FAILED",
-                    true));
+            synchronized (state) {
+                appendToolResult(sessionId, state, toolCallId, toolName, normalized);
+                appendEvent(sessionId, emitter, new AgentErrorEvent(
+                        IdGenerator.eventId(),
+                        sessionId,
+                        Instant.now(),
+                        toolName + ": " + normalized.text(),
+                        "TOOL_CALL_FAILED",
+                        true));
+            }
         }
     }
 

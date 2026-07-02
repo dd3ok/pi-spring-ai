@@ -1,8 +1,10 @@
 package com.example.pispringai.tool.builtin;
 
 import com.example.pispringai.tool.ToolArguments;
+import com.example.pispringai.tool.ToolExecutionContext;
 import com.example.pispringai.tool.ToolProperties;
 import com.example.pispringai.tool.ToolResult;
+import com.example.pispringai.agent.AgentRunOptions;
 import com.example.pispringai.workspace.SafePathResolver;
 import com.example.pispringai.workspace.SecretFileGuard;
 import com.example.pispringai.workspace.WorkspaceProperties;
@@ -90,6 +92,27 @@ class ReadToolTest {
 
         assertThat(result.error()).isFalse();
         assertThat(result.text()).isEqualTo("hello");
+    }
+
+    @Test
+    void readsUsingWorkspaceRootFromExecutionContextWhenProvided() throws Exception {
+        Path defaultWorkspace = Files.createDirectories(tempDir.resolve("default-workspace"));
+        Path sessionWorkspace = Files.createDirectories(tempDir.resolve("session-workspace"));
+        Files.writeString(defaultWorkspace.resolve("README.md"), "default");
+        Files.writeString(sessionWorkspace.resolve("README.md"), "session");
+        WorkspaceProperties workspaceProperties = new WorkspaceProperties(defaultWorkspace, 100, 200, 100);
+        ReadTool tool = new ReadTool(
+                new SafePathResolver(workspaceProperties),
+                new SecretFileGuard(),
+                workspaceProperties,
+                new ToolProperties(200));
+
+        ToolResult result = tool.execute(
+                args("README.md"),
+                new ToolExecutionContext(AgentRunOptions.safeDefaults(), sessionWorkspace));
+
+        assertThat(result.error()).isFalse();
+        assertThat(result.text()).isEqualTo("session");
     }
 
     private ReadTool newTool(long maxReadBytes, int maxOutputChars) {

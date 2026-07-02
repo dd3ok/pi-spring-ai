@@ -5,6 +5,7 @@ import com.example.pispringai.agent.AgentRuntime;
 import com.example.pispringai.agent.event.AgentEvent;
 import com.example.pispringai.session.AgentSession;
 import com.example.pispringai.session.SessionStore;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -33,7 +34,7 @@ public class AgentController {
 
     @PostMapping
     public Mono<CreateSessionResponse> createSession(@RequestBody CreateSessionRequest request) {
-        return Mono.fromCallable(() -> sessionStore.create(Path.of(request.workspaceRoot())))
+        return Mono.fromCallable(() -> sessionStore.create(workspaceRoot(request.workspaceRoot())))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(session -> new CreateSessionResponse(session.id(), session.workspaceRoot().toString()));
     }
@@ -61,5 +62,13 @@ public class AgentController {
     private AgentSession findSession(String sessionId) {
         return sessionStore.findSession(sessionId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Session not found"));
+    }
+
+    private static Path workspaceRoot(String rawWorkspaceRoot) {
+        try {
+            return Path.of(rawWorkspaceRoot);
+        } catch (InvalidPathException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid workspace root path", exception);
+        }
     }
 }

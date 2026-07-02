@@ -23,7 +23,7 @@ public class ToolExecutionService {
 
         ToolResult result;
         try {
-            result = tool.execute(arguments);
+            result = tool.execute(arguments, context);
         } catch (RuntimeException exception) {
             result = ToolResult.error(
                     "tool execution failed: " + exceptionMessage(exception),

@@ -24,7 +24,7 @@ public class SpringAiModelClient implements ModelClient {
         Objects.requireNonNull(command, "command must not be null");
         return chatClient.prompt()
                 .user(command.userText())
-                .tools(toolCallbackFactory.callbacksFor(command.options(), events))
+                .tools(toolCallbackFactory.callbacksFor(command.options(), command.workspaceRoot(), events))
                 .stream()
                 .content();
     }

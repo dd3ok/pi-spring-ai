@@ -1,6 +1,7 @@
 package com.example.pispringai.model;
 
 import com.example.pispringai.agent.AgentRunOptions;
+import com.example.pispringai.agent.IdGenerator;
 import com.example.pispringai.tool.AgentTool;
 import com.example.pispringai.tool.ToolArguments;
 import com.example.pispringai.tool.ToolExecutionContext;
@@ -11,6 +12,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -37,12 +39,23 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
             ObjectMapper objectMapper,
             SpringAiToolCallbackEvents events
     ) {
+        this(tool, toolExecutionService, options, null, objectMapper, events);
+    }
+
+    public SpringAiToolCallbackAdapter(
+            AgentTool tool,
+            ToolExecutionService toolExecutionService,
+            AgentRunOptions options,
+            Path workspaceRoot,
+            ObjectMapper objectMapper,
+            SpringAiToolCallbackEvents events
+    ) {
         this.tool = Objects.requireNonNull(tool, "tool must not be null");
         this.spec = Objects.requireNonNull(tool.spec(), "tool spec must not be null");
         this.toolExecutionService = Objects.requireNonNull(
                 toolExecutionService,
                 "toolExecutionService must not be null");
-        this.context = new ToolExecutionContext(Objects.requireNonNull(options, "options must not be null"));
+        this.context = new ToolExecutionContext(Objects.requireNonNull(options, "options must not be null"), workspaceRoot);
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.events = Objects.requireNonNull(events, "events must not be null");
         this.toolDefinition = toToolDefinition(spec);
@@ -55,21 +68,22 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
 
     @Override
     public String call(String toolInput) {
+        String toolCallId = IdGenerator.toolCallId();
         ToolArguments arguments;
         try {
             arguments = parseArguments(toolInput);
         } catch (RuntimeException exception) {
             ToolResult result = ToolResult.error("invalid tool arguments: " + exceptionMessage(exception));
-            events.toolCallFailed(spec.name(), result);
+            events.toolCallFailed(toolCallId, spec.name(), result);
             return serializeResult(result);
         }
 
-        events.toolCallStarted(spec.name(), arguments);
+        events.toolCallStarted(toolCallId, spec.name(), arguments);
         ToolResult result = normalizeResult(toolExecutionService.execute(tool, arguments, context));
         if (isPolicyDenied(result)) {
-            events.toolCallDenied(spec.name(), result);
+            events.toolCallDenied(toolCallId, spec.name(), result);
         } else {
-            events.toolCallFinished(spec.name(), result);
+            events.toolCallFinished(toolCallId, spec.name(), result);
         }
         return serializeResult(result);
     }

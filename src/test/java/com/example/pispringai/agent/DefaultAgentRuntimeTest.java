@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import reactor.core.publisher.Flux;
@@ -112,8 +113,8 @@ class DefaultAgentRuntimeTest {
         JsonlSessionStore store = newStore();
         AgentSession session = store.create(tempDir.resolve("workspace"));
         ModelClient model = (command, events) -> Flux.defer(() -> {
-            events.toolCallStarted("write", new ToolArguments(Map.of("path", "demo.md")));
-            events.toolCallDenied("write", ToolResult.error("Denied: allowWrite=false"));
+            events.toolCallStarted("tc_write", "write", new ToolArguments(Map.of("path", "demo.md")));
+            events.toolCallDenied("tc_write", "write", ToolResult.error("Denied: allowWrite=false"));
             return Flux.just("cannot write");
         });
         AgentRuntime runtime = new DefaultAgentRuntime(store, model);
@@ -137,6 +138,81 @@ class DefaultAgentRuntimeTest {
         assertThat(toolResult.error()).isTrue();
     }
 
+    @Test
+    void toolCallbacksKeepExplicitCallIdsWhenSameToolFinishesOutOfOrder() {
+        JsonlSessionStore store = newStore();
+        AgentSession session = store.create(tempDir.resolve("workspace"));
+        ModelClient model = (command, events) -> Flux.defer(() -> {
+            events.toolCallStarted("tc_first", "read", new ToolArguments(Map.of("path", "one.md")));
+            events.toolCallStarted("tc_second", "read", new ToolArguments(Map.of("path", "two.md")));
+            events.toolCallFinished("tc_second", "read", ToolResult.ok("second"));
+            events.toolCallFinished("tc_first", "read", ToolResult.ok("first"));
+            return Flux.just("done");
+        });
+        AgentRuntime runtime = new DefaultAgentRuntime(store, model);
+
+        List<AgentEvent> events = runtime.prompt(command(session, "read twice")).collectList().block();
+
+        assertThat(events)
+                .filteredOn(event -> event.type() == AgentEventType.TOOL_CALL_FINISHED)
+                .extracting(event -> ((com.example.pispringai.agent.event.ToolCallFinishedEvent) event).callId())
+                .containsExactly("tc_second", "tc_first");
+        assertThat(store.loadMessages(session.id()))
+                .filteredOn(ToolResultMessage.class::isInstance)
+                .map(ToolResultMessage.class::cast)
+                .extracting(ToolResultMessage::toolCallId)
+                .containsExactly("tc_second", "tc_first");
+    }
+
+    @Test
+    void concurrentToolResultsAppendWithLinearMessageParents() {
+        RecordingSessionStore store = new RecordingSessionStore();
+        AgentSession session = store.create(tempDir.resolve("workspace"));
+        ModelClient model = (command, events) -> Flux.defer(() -> {
+            events.toolCallStarted("tc_one", "read", new ToolArguments(Map.of("path", "one.md")));
+            events.toolCallStarted("tc_two", "read", new ToolArguments(Map.of("path", "two.md")));
+            Thread first = new Thread(() -> events.toolCallFinished("tc_one", "read", ToolResult.ok("one")));
+            Thread second = new Thread(() -> events.toolCallFinished("tc_two", "read", ToolResult.ok("two")));
+            first.start();
+            second.start();
+            join(first);
+            join(second);
+            return Flux.just("done");
+        });
+        AgentRuntime runtime = new DefaultAgentRuntime(store, model);
+
+        runtime.prompt(command(session, "read concurrently")).collectList().block();
+
+        List<ToolResultMessage> toolResults = store.messages().stream()
+                .filter(ToolResultMessage.class::isInstance)
+                .map(ToolResultMessage.class::cast)
+                .toList();
+        assertThat(toolResults).hasSize(2);
+        assertThat(toolResults.get(1).parentId()).isEqualTo(toolResults.get(0).id());
+    }
+
+    @Test
+    void failedToolCallbacksPersistErrorToolResultForReplay() {
+        JsonlSessionStore store = newStore();
+        AgentSession session = store.create(tempDir.resolve("workspace"));
+        ModelClient model = (command, events) -> Flux.defer(() -> {
+            events.toolCallFailed("tc_bad_args", "read", ToolResult.error("invalid tool arguments"));
+            return Flux.just("done");
+        });
+        AgentRuntime runtime = new DefaultAgentRuntime(store, model);
+
+        List<AgentEvent> events = runtime.prompt(command(session, "bad tool call")).collectList().block();
+
+        assertThat(events)
+                .extracting(AgentEvent::type)
+                .contains(AgentEventType.AGENT_ERROR);
+        ToolResultMessage toolResult = (ToolResultMessage) store.loadMessages(session.id()).get(1);
+        assertThat(toolResult.toolCallId()).isEqualTo("tc_bad_args");
+        assertThat(toolResult.toolName()).isEqualTo("read");
+        assertThat(toolResult.resultText()).isEqualTo("invalid tool arguments");
+        assertThat(toolResult.error()).isTrue();
+    }
+
     private JsonlSessionStore newStore() {
         return new JsonlSessionStore(new SessionProperties(tempDir.resolve("sessions")), objectMapper);
     }
@@ -147,5 +223,63 @@ class DefaultAgentRuntimeTest {
                 text,
                 session.workspaceRoot(),
                 AgentRunOptions.safeDefaults());
+    }
+
+    private static void join(Thread thread) {
+        try {
+            thread.join(5_000);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while waiting for tool callback thread", exception);
+        }
+        assertThat(thread.isAlive()).isFalse();
+    }
+
+    private static final class RecordingSessionStore implements com.example.pispringai.session.SessionStore {
+
+        private final List<AgentMessage> messages = new CopyOnWriteArrayList<>();
+        private final List<AgentEvent> events = new CopyOnWriteArrayList<>();
+        private AgentSession session;
+
+        @Override
+        public AgentSession create(Path workspaceRoot) {
+            session = new AgentSession(
+                    "s_concurrent",
+                    workspaceRoot,
+                    java.time.Instant.parse("2026-06-29T00:00:00Z"),
+                    java.time.Instant.parse("2026-06-29T00:00:00Z"),
+                    null);
+            return session;
+        }
+
+        @Override
+        public java.util.Optional<AgentSession> findSession(String sessionId) {
+            return java.util.Optional.ofNullable(session)
+                    .filter(candidate -> candidate.id().equals(sessionId));
+        }
+
+        @Override
+        public void appendMessage(String sessionId, AgentMessage message) {
+            messages.add(message);
+        }
+
+        @Override
+        public void appendEvent(String sessionId, AgentEvent event) {
+            events.add(event);
+        }
+
+        @Override
+        public List<AgentMessage> loadMessages(String sessionId) {
+            return List.copyOf(messages);
+        }
+
+        @Override
+        public List<AgentEvent> loadEvents(String sessionId) {
+            return List.copyOf(events);
+        }
+
+        private List<AgentMessage> messages() {
+            return List.copyOf(messages);
+        }
     }
 }

@@ -4,6 +4,7 @@ import com.example.pispringai.agent.AgentRunOptions;
 import com.example.pispringai.tool.ToolExecutionService;
 import com.example.pispringai.tool.ToolRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.ai.tool.ToolCallback;
@@ -55,12 +56,21 @@ public class SpringAiToolCallbackFactory {
     }
 
     public List<ToolCallback> callbacksFor(AgentRunOptions options, SpringAiToolCallbackEvents callbackEvents) {
+        return callbacksFor(options, null, callbackEvents);
+    }
+
+    public List<ToolCallback> callbacksFor(
+            AgentRunOptions options,
+            Path workspaceRoot,
+            SpringAiToolCallbackEvents callbackEvents
+    ) {
         SpringAiToolCallbackEvents resolvedEvents = callbackEvents == null ? events : callbackEvents;
         return toolRegistry.enabledTools(options).stream()
                 .map(tool -> new SpringAiToolCallbackAdapter(
                         tool,
                         toolExecutionService,
                         options,
+                        workspaceRoot,
                         objectMapper,
                         resolvedEvents))
                 .map(ToolCallback.class::cast)
@@ -73,5 +83,13 @@ public class SpringAiToolCallbackFactory {
 
     public ToolCallbackProvider providerFor(AgentRunOptions options, SpringAiToolCallbackEvents callbackEvents) {
         return ToolCallbackProvider.from(callbacksFor(options, callbackEvents));
+    }
+
+    public ToolCallbackProvider providerFor(
+            AgentRunOptions options,
+            Path workspaceRoot,
+            SpringAiToolCallbackEvents callbackEvents
+    ) {
+        return ToolCallbackProvider.from(callbacksFor(options, workspaceRoot, callbackEvents));
     }
 }

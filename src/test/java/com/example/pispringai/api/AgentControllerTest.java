@@ -49,6 +49,16 @@ class AgentControllerTest {
     }
 
     @Test
+    void createSessionReturnsBadRequestForInvalidWorkspaceRoot() {
+        webTestClient.post()
+                .uri("/api/sessions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"workspaceRoot\":\"bad\\u0000path\"}")
+                .exchange()
+                .expectStatus().isBadRequest();
+    }
+
+    @Test
     void streamMessageReturnsAgentEventsAsSseAndPassesRunOptions() {
         webTestClient.post()
                 .uri("/api/sessions/s_existing/messages/stream")
@@ -71,6 +81,20 @@ class AgentControllerTest {
         assertThat(runtime.lastCommand.sessionId()).isEqualTo("s_existing");
         assertThat(runtime.lastCommand.userText()).isEqualTo("hello");
         assertThat(runtime.lastCommand.options().allowWrite()).isTrue();
+        assertThat(runtime.lastCommand.options().allowBash()).isFalse();
+    }
+
+    @Test
+    void streamMessageDefaultsMissingToolOptionsToSafeFalse() {
+        webTestClient.post()
+                .uri("/api/sessions/s_existing/messages/stream")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"text\":\"hello\"}")
+                .exchange()
+                .expectStatus().isOk();
+
+        assertThat(runtime.lastCommand.options().allowWrite()).isFalse();
         assertThat(runtime.lastCommand.options().allowBash()).isFalse();
     }
 
