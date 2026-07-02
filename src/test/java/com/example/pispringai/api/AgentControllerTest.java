@@ -1,0 +1,165 @@
+package com.example.pispringai.api;
+
+import com.example.pispringai.agent.AgentPromptCommand;
+import com.example.pispringai.agent.AgentRuntime;
+import com.example.pispringai.agent.event.AgentCompletedEvent;
+import com.example.pispringai.agent.event.AgentEvent;
+import com.example.pispringai.agent.event.AgentStartedEvent;
+import com.example.pispringai.agent.message.AgentMessage;
+import com.example.pispringai.session.AgentSession;
+import com.example.pispringai.session.SessionStore;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webflux.test.autoconfigure.WebFluxTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Flux;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+@WebFluxTest(AgentController.class)
+@Import(AgentControllerTest.FakeAgentConfig.class)
+class AgentControllerTest {
+
+    @Autowired
+    private WebTestClient webTestClient;
+
+    @Autowired
+    private RecordingRuntime runtime;
+
+    @Test
+    void createSessionReturnsSessionIdAndWorkspaceRoot() {
+        webTestClient.post()
+                .uri("/api/sessions")
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"workspaceRoot\":\"build/sample-workspace\"}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.sessionId").isEqualTo("s_1")
+                .jsonPath("$.workspaceRoot").isEqualTo(Path.of("build/sample-workspace").toAbsolutePath().normalize().toString());
+    }
+
+    @Test
+    void streamMessageReturnsAgentEventsAsSseAndPassesRunOptions() {
+        webTestClient.post()
+                .uri("/api/sessions/s_existing/messages/stream")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"text\":\"hello\",\"allowWrite\":true,\"allowBash\":false}")
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM)
+                .expectBody(String.class)
+                .consumeWith(result -> {
+                    String body = result.getResponseBody();
+                    assertThat(body).contains("event:agent_event");
+                    assertThat(body).contains("id:e_1");
+                    assertThat(body).contains("agent_started");
+                    assertThat(body).contains("agent_completed");
+                });
+
+        assertThat(runtime.lastCommand).isNotNull();
+        assertThat(runtime.lastCommand.sessionId()).isEqualTo("s_existing");
+        assertThat(runtime.lastCommand.userText()).isEqualTo("hello");
+        assertThat(runtime.lastCommand.options().allowWrite()).isTrue();
+        assertThat(runtime.lastCommand.options().allowBash()).isFalse();
+    }
+
+    @Test
+    void streamMessageReturnsNotFoundForMissingSession() {
+        webTestClient.post()
+                .uri("/api/sessions/s_missing/messages/stream")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"text\":\"hello\"}")
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
+    @TestConfiguration
+    static class FakeAgentConfig {
+
+        @Bean
+        SessionStore sessionStore() {
+            return new FakeSessionStore();
+        }
+
+        @Bean
+        RecordingRuntime agentRuntime() {
+            return new RecordingRuntime();
+        }
+    }
+
+    private static final class RecordingRuntime implements AgentRuntime {
+
+        private AgentPromptCommand lastCommand;
+
+        @Override
+        public Flux<AgentEvent> prompt(AgentPromptCommand command) {
+            this.lastCommand = command;
+            return Flux.just(
+                    new AgentStartedEvent("e_1", command.sessionId(), Instant.parse("2026-06-29T00:00:00Z")),
+                    new AgentCompletedEvent("e_2", command.sessionId(), Instant.parse("2026-06-29T00:00:01Z")));
+        }
+    }
+
+    private static final class FakeSessionStore implements SessionStore {
+
+        private final List<AgentSession> sessions = new ArrayList<>();
+
+        private FakeSessionStore() {
+            sessions.add(new AgentSession(
+                    "s_existing",
+                    Path.of("build/sample-workspace"),
+                    Instant.parse("2026-06-29T00:00:00Z"),
+                    Instant.parse("2026-06-29T00:00:00Z"),
+                    null));
+        }
+
+        @Override
+        public AgentSession create(Path workspaceRoot) {
+            AgentSession session = new AgentSession(
+                    "s_1",
+                    workspaceRoot,
+                    Instant.parse("2026-06-29T00:00:00Z"),
+                    Instant.parse("2026-06-29T00:00:00Z"),
+                    null);
+            sessions.add(session);
+            return session;
+        }
+
+        @Override
+        public Optional<AgentSession> findSession(String sessionId) {
+            return sessions.stream()
+                    .filter(session -> session.id().equals(sessionId))
+                    .findFirst();
+        }
+
+        @Override
+        public void appendMessage(String sessionId, AgentMessage message) {
+        }
+
+        @Override
+        public void appendEvent(String sessionId, AgentEvent event) {
+        }
+
+        @Override
+        public List<AgentMessage> loadMessages(String sessionId) {
+            return List.of();
+        }
+
+        @Override
+        public List<AgentEvent> loadEvents(String sessionId) {
+            return List.of();
+        }
+    }
+}

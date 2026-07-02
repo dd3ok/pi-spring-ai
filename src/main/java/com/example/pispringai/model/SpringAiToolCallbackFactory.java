@@ -51,18 +51,27 @@ public class SpringAiToolCallbackFactory {
     }
 
     public List<ToolCallback> callbacksFor(AgentRunOptions options) {
+        return callbacksFor(options, events);
+    }
+
+    public List<ToolCallback> callbacksFor(AgentRunOptions options, SpringAiToolCallbackEvents callbackEvents) {
+        SpringAiToolCallbackEvents resolvedEvents = callbackEvents == null ? events : callbackEvents;
         return toolRegistry.enabledTools(options).stream()
                 .map(tool -> new SpringAiToolCallbackAdapter(
                         tool,
                         toolExecutionService,
                         options,
                         objectMapper,
-                        events))
+                        resolvedEvents))
                 .map(ToolCallback.class::cast)
                 .toList();
     }
 
     public ToolCallbackProvider providerFor(AgentRunOptions options) {
         return ToolCallbackProvider.from(callbacksFor(options));
+    }
+
+    public ToolCallbackProvider providerFor(AgentRunOptions options, SpringAiToolCallbackEvents callbackEvents) {
+        return ToolCallbackProvider.from(callbacksFor(options, callbackEvents));
     }
 }
