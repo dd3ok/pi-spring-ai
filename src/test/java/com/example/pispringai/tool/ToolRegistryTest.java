@@ -1,7 +1,9 @@
 package com.example.pispringai.tool;
 
+import com.example.pispringai.agent.AgentRunOptions;
 import com.example.pispringai.workspace.SafePathResolver;
 import com.example.pispringai.workspace.WorkspaceProperties;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -27,6 +29,28 @@ class ToolRegistryTest {
         assertThat(registry.enabledTools()).containsExactly(read, ls);
         assertThat(registry.get("read")).isSameAs(read);
         assertThat(registry.get("ls")).isSameAs(ls);
+    }
+
+    @Test
+    void filtersEnabledToolsByRunOptionsSafetyFlags() {
+        AgentTool read = new StubTool("read", ToolSafetyLevel.READ_ONLY, true);
+        AgentTool write = new StubTool("write", ToolSafetyLevel.WRITE, false);
+        AgentTool bash = new StubTool("bash", ToolSafetyLevel.BASH, false);
+        ToolRegistry registry = new ToolRegistry(List.of(read, write, bash));
+
+        assertThat(registry.enabledTools(AgentRunOptions.safeDefaults())).containsExactly(read);
+        assertThat(registry.enabledTools(new AgentRunOptions(
+                true,
+                false,
+                6,
+                12,
+                Duration.ofSeconds(120)))).containsExactly(read, write);
+        assertThat(registry.enabledTools(new AgentRunOptions(
+                false,
+                true,
+                6,
+                12,
+                Duration.ofSeconds(120)))).containsExactly(read, bash);
     }
 
     @Test
@@ -69,10 +93,15 @@ class ToolRegistryTest {
                 });
     }
 
-    private record StubTool(String name) implements AgentTool {
+    private record StubTool(String name, ToolSafetyLevel safetyLevel, boolean enabledByDefault) implements AgentTool {
+
+        private StubTool(String name) {
+            this(name, ToolSafetyLevel.READ_ONLY, true);
+        }
+
         @Override
         public ToolSpec spec() {
-            return new ToolSpec(name, "stub", Map.of(), ToolSafetyLevel.READ_ONLY, true);
+            return new ToolSpec(name, "stub", Map.of(), safetyLevel, enabledByDefault);
         }
 
         @Override
