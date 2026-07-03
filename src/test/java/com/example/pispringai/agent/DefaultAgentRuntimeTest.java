@@ -19,9 +19,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import reactor.core.publisher.Flux;
@@ -71,6 +73,52 @@ class DefaultAgentRuntimeTest {
                             assertThat(assistant.text()).isEqualTo("hello");
                             assertThat(assistant.stopReason()).isEqualTo(AssistantStopReason.STOP);
                         });
+    }
+
+    @Test
+    void promptLinksFollowUpUserMessageToPreviousMessage() {
+        JsonlSessionStore store = newStore();
+        AgentSession session = store.create(tempDir.resolve("workspace"));
+        AgentRuntime runtime = new DefaultAgentRuntime(store, (command, events) -> Flux.just("ok"));
+
+        runtime.prompt(command(session, "first")).collectList().block();
+        runtime.prompt(command(session, "second")).collectList().block();
+
+        List<AgentMessage> messages = store.loadMessages(session.id());
+        assertThat(messages).hasSize(4);
+        assertThat(messages.get(0)).isInstanceOf(UserMessage.class);
+        assertThat(messages.get(1)).isInstanceOf(AssistantMessage.class);
+        assertThat(messages.get(2)).isInstanceOf(UserMessage.class);
+        assertThat(messages.get(3)).isInstanceOf(AssistantMessage.class);
+        assertThat(messages.get(2).parentId()).isEqualTo(messages.get(1).id());
+        assertThat(messages.get(3).parentId()).isEqualTo(messages.get(2).id());
+    }
+
+    @Test
+    void promptPassesPersistedSessionMessagesToModelClient() {
+        JsonlSessionStore store = newStore();
+        AgentSession session = store.create(tempDir.resolve("workspace"));
+        AtomicReference<List<AgentMessage>> secondPromptMessages = new AtomicReference<>();
+        ModelClient model = (command, events) -> {
+            if (command.userText().equals("second")) {
+                secondPromptMessages.set(new ArrayList<>(command.messages()));
+            }
+            return Flux.just("ok");
+        };
+        AgentRuntime runtime = new DefaultAgentRuntime(store, model);
+
+        runtime.prompt(command(session, "first")).collectList().block();
+        runtime.prompt(command(session, "second")).collectList().block();
+
+        assertThat(secondPromptMessages.get())
+                .extracting(AgentMessage::kind)
+                .containsExactly(
+                        com.example.pispringai.agent.message.AgentMessageKind.USER,
+                        com.example.pispringai.agent.message.AgentMessageKind.ASSISTANT,
+                        com.example.pispringai.agent.message.AgentMessageKind.USER);
+        assertThat(((UserMessage) secondPromptMessages.get().get(0)).text()).isEqualTo("first");
+        assertThat(((AssistantMessage) secondPromptMessages.get().get(1)).text()).isEqualTo("ok");
+        assertThat(((UserMessage) secondPromptMessages.get().get(2)).text()).isEqualTo("second");
     }
 
     @Test

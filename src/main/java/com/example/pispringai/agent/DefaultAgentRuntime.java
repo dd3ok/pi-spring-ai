@@ -10,6 +10,7 @@ import com.example.pispringai.agent.event.ToolCallDeniedEvent;
 import com.example.pispringai.agent.event.ToolCallFinishedEvent;
 import com.example.pispringai.agent.event.ToolCallStartedEvent;
 import com.example.pispringai.agent.event.UserMessageAppendedEvent;
+import com.example.pispringai.agent.message.AgentMessage;
 import com.example.pispringai.agent.message.AssistantMessage;
 import com.example.pispringai.agent.message.AssistantStopReason;
 import com.example.pispringai.agent.message.ToolResultMessage;
@@ -21,8 +22,10 @@ import com.example.pispringai.tool.ToolArguments;
 import com.example.pispringai.tool.ToolResult;
 import java.time.Instant;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.springframework.stereotype.Service;
@@ -50,12 +53,14 @@ public class DefaultAgentRuntime implements AgentRuntime {
     }
 
     private void startRun(AgentPromptCommand command, FluxSink<AgentEvent> emitter) {
-        RunState state = new RunState();
+        RunState state = new RunState(null);
         StringBuilder assistantText = new StringBuilder();
         AtomicBoolean finished = new AtomicBoolean(false);
         SpringAiToolCallbackEvents toolEvents = new RuntimeToolCallbackEvents(command.sessionId(), state, emitter);
 
         try {
+            List<AgentMessage> existingMessages = sessionStore.loadMessages(command.sessionId());
+            state.updateLastMessageId(lastMessageId(existingMessages));
             emit(command.sessionId(), state, emitter, new AgentStartedEvent(
                     IdGenerator.eventId(),
                     command.sessionId(),
@@ -64,7 +69,7 @@ public class DefaultAgentRuntime implements AgentRuntime {
             UserMessage userMessage = new UserMessage(
                     IdGenerator.messageId(),
                     command.sessionId(),
-                    null,
+                    state.lastMessageId(),
                     Instant.now(),
                     command.userText());
             synchronized (state) {
@@ -76,9 +81,10 @@ public class DefaultAgentRuntime implements AgentRuntime {
                         Instant.now(),
                         userMessage.id()));
             }
+            AgentPromptCommand modelCommand = command.withMessages(appended(existingMessages, userMessage));
 
             Flux<String> modelStream = Objects.requireNonNull(
-                    modelClient.streamText(command, toolEvents),
+                    modelClient.streamText(modelCommand, toolEvents),
                     "model stream must not be null");
             Disposable disposable = modelStream.subscribe(
                     text -> appendAssistantDelta(command.sessionId(), state, assistantText, emitter, text),
@@ -201,6 +207,16 @@ public class DefaultAgentRuntime implements AgentRuntime {
                 : message;
     }
 
+    private static String lastMessageId(List<AgentMessage> messages) {
+        return messages.isEmpty() ? null : messages.getLast().id();
+    }
+
+    private static List<AgentMessage> appended(List<AgentMessage> messages, AgentMessage message) {
+        List<AgentMessage> appended = new ArrayList<>(messages);
+        appended.add(message);
+        return List.copyOf(appended);
+    }
+
     private final class RuntimeToolCallbackEvents implements SpringAiToolCallbackEvents {
 
         private final String sessionId;
@@ -296,6 +312,10 @@ public class DefaultAgentRuntime implements AgentRuntime {
 
         private final Deque<PendingToolCall> pendingToolCalls = new ArrayDeque<>();
         private String lastMessageId;
+
+        private RunState(String lastMessageId) {
+            this.lastMessageId = lastMessageId;
+        }
 
         private synchronized String startToolCall(String toolName) {
             String callId = IdGenerator.toolCallId();
