@@ -63,6 +63,17 @@ class EditToolTest {
     }
 
     @Test
+    void failsWhenOldTextIsEmpty() throws Exception {
+        Files.writeString(workspace.resolve("notes.txt"), "hello world");
+
+        ToolResult result = newTool(100).execute(args("notes.txt", "", "new"));
+
+        assertThat(result.error()).isTrue();
+        assertThat(result.text()).contains("oldText must not be empty");
+        assertThat(Files.readString(workspace.resolve("notes.txt"))).isEqualTo("hello world");
+    }
+
+    @Test
     void failsWhenOldTextMatchesMultipleTimes() throws Exception {
         Files.writeString(workspace.resolve("notes.txt"), "old and old");
 

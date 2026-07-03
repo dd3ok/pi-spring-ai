@@ -50,7 +50,7 @@ public class WriteTool implements AgentTool {
     public ToolResult execute(ToolArguments arguments, ToolExecutionContext context) {
         try {
             String pathArgument = arguments.requiredString("path");
-            String content = requiredStringValue(arguments, "content");
+            String content = requiredStringAllowingBlank(arguments, "content");
             boolean overwrite = optionalBoolean(arguments, "overwrite", false);
             Path workspaceRoot = pathResolver.workspaceRoot(context.workspaceRoot());
             ResolvedWriteTarget resolvedTarget = resolveTarget(workspaceRoot, pathArgument);
@@ -106,7 +106,7 @@ public class WriteTool implements AgentTool {
         }
     }
 
-    private static String requiredStringValue(ToolArguments arguments, String name) {
+    private static String requiredStringAllowingBlank(ToolArguments arguments, String name) {
         Object value = arguments.values().get(name);
         if (!(value instanceof String stringValue)) {
             throw new IllegalArgumentException("missing required string argument: " + name);

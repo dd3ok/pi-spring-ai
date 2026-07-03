@@ -68,8 +68,8 @@ public class EditTool implements AgentTool {
                 return ToolResult.error("file is too large: " + size + " bytes");
             }
 
-            String oldText = arguments.requiredString("oldText");
-            String newText = requiredStringValue(arguments, "newText");
+            String oldText = requiredNonBlankString(arguments, "oldText");
+            String newText = requiredStringAllowingBlank(arguments, "newText");
             String text = TextFileReader.decodeUtf8Text(Files.readAllBytes(file));
             int matches = countMatches(text, oldText);
             if (matches == 0) {
@@ -101,6 +101,9 @@ public class EditTool implements AgentTool {
     }
 
     private static int countMatches(String text, String oldText) {
+        if (oldText.isEmpty()) {
+            return 0;
+        }
         int count = 0;
         int fromIndex = 0;
         int matchIndex;
@@ -111,7 +114,15 @@ public class EditTool implements AgentTool {
         return count;
     }
 
-    private static String requiredStringValue(ToolArguments arguments, String name) {
+    private static String requiredNonBlankString(ToolArguments arguments, String name) {
+        String value = requiredStringAllowingBlank(arguments, name);
+        if (value.isBlank()) {
+            throw new IllegalArgumentException(name + " must not be empty");
+        }
+        return value;
+    }
+
+    private static String requiredStringAllowingBlank(ToolArguments arguments, String name) {
         Object value = arguments.values().get(name);
         if (!(value instanceof String stringValue)) {
             throw new IllegalArgumentException("missing required string argument: " + name);
