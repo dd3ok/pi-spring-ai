@@ -31,14 +31,28 @@ public class SafePathResolver {
         return workspaceRoot;
     }
 
+    public Path workspaceRoot(Path overrideRoot) {
+        return overrideRoot == null ? workspaceRoot : realPath(overrideRoot, "workspace root");
+    }
+
     public Path resolveExisting(String userPath) {
-        Path realPath = realPath(candidatePath(userPath), "workspace path");
-        assertInsideWorkspace(realPath);
+        return resolveExisting(workspaceRoot, userPath);
+    }
+
+    public Path resolveExisting(Path workspaceRoot, String userPath) {
+        Path root = workspaceRoot(workspaceRoot);
+        Path realPath = realPath(candidatePath(root, userPath), "workspace path");
+        assertInsideWorkspace(root, realPath);
         return realPath;
     }
 
     public Path resolveForFuturePath(String userPath) {
-        Path candidate = candidatePath(userPath);
+        return resolveForFuturePath(workspaceRoot, userPath);
+    }
+
+    public Path resolveForFuturePath(Path workspaceRoot, String userPath) {
+        Path root = workspaceRoot(workspaceRoot);
+        Path candidate = candidatePath(root, userPath);
         Path parent = candidate.getParent();
         Path fileName = candidate.getFileName();
         if (parent == null || fileName == null) {
@@ -46,7 +60,7 @@ public class SafePathResolver {
         }
 
         Path realParent = realPath(parent, "workspace path parent");
-        assertInsideWorkspace(realParent);
+        assertInsideWorkspace(root, realParent);
         if (!readAttributes(realParent, "workspace path parent").isDirectory()) {
             throw new WorkspaceAccessDeniedException("future workspace path parent is not a directory: " + realParent);
         }
@@ -54,7 +68,7 @@ public class SafePathResolver {
         return realParent.resolve(fileName).normalize();
     }
 
-    private Path candidatePath(String userPath) {
+    private Path candidatePath(Path root, String userPath) {
         if (userPath == null || userPath.isBlank()) {
             throw new WorkspaceAccessDeniedException("path must not be blank");
         }
@@ -62,7 +76,7 @@ public class SafePathResolver {
         try {
             rejectAmbiguousWindowsPath(userPath);
             Path input = Path.of(userPath.replace('\\', File.separatorChar));
-            return (input.isAbsolute() ? input : workspaceRoot.resolve(input)).normalize();
+            return (input.isAbsolute() ? input : root.resolve(input)).normalize();
         } catch (InvalidPathException exception) {
             throw new WorkspaceAccessDeniedException("invalid workspace path: " + userPath, exception);
         }
@@ -110,7 +124,7 @@ public class SafePathResolver {
         }
     }
 
-    private void assertInsideWorkspace(Path path) {
+    private static void assertInsideWorkspace(Path workspaceRoot, Path path) {
         if (!path.startsWith(workspaceRoot)) {
             throw new WorkspaceAccessDeniedException("path is outside workspace: " + path);
         }

@@ -2,6 +2,7 @@ package com.example.pispringai.tool.builtin;
 
 import com.example.pispringai.tool.AgentTool;
 import com.example.pispringai.tool.ToolArguments;
+import com.example.pispringai.tool.ToolExecutionContext;
 import com.example.pispringai.tool.ToolOutputLimiter;
 import com.example.pispringai.tool.ToolProperties;
 import com.example.pispringai.tool.ToolResult;
@@ -51,20 +52,26 @@ public class FindTool implements AgentTool {
 
     @Override
     public ToolResult execute(ToolArguments arguments) {
+        return execute(arguments, ToolExecutionContext.safeDefaults());
+    }
+
+    @Override
+    public ToolResult execute(ToolArguments arguments, ToolExecutionContext context) {
         try {
             String pattern = arguments.requiredString("pattern");
-            Path root = pathResolver.resolveExisting(arguments.optionalString("path").orElse("."));
+            Path workspaceRoot = pathResolver.workspaceRoot(context.workspaceRoot());
+            Path root = pathResolver.resolveExisting(workspaceRoot, arguments.optionalString("path").orElse("."));
             if (!Files.isDirectory(root)) {
                 return ToolResult.error("path is not a directory: " + root);
             }
-            if (WorkspaceWalk.shouldSkipRoot(pathResolver.workspaceRoot(), root, secretFileGuard)) {
+            if (WorkspaceWalk.shouldSkipRoot(workspaceRoot, root, secretFileGuard)) {
                 return ToolResult.error("path is denied: " + root);
             }
 
             GlobMatcher matcher = new GlobMatcher(pattern);
             List<String> matches = new ArrayList<>();
             WorkspaceWalk.walkRegularFiles(root, secretFileGuard, path -> {
-                String relative = WorkspaceWalk.relativePath(pathResolver.workspaceRoot(), path);
+                String relative = WorkspaceWalk.relativePath(workspaceRoot, path);
                 if (matcher.matches(relative)) {
                     matches.add(relative);
                 }

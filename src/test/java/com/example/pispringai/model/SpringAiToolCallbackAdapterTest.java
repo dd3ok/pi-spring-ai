@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.definition.ToolDefinition;
@@ -76,7 +77,27 @@ class SpringAiToolCallbackAdapterTest {
         assertThat(executionService.context().options()).isEqualTo(options);
         assertThat(events.startedCount()).isEqualTo(1);
         assertThat(events.finishedCount()).isEqualTo(1);
+        assertThat(events.finishedCallId()).isEqualTo(events.startedCallId());
+        assertThat(events.finishedCallId()).startsWith("tc_");
         assertThat(events.deniedCount()).isZero();
+    }
+
+    @Test
+    void passesWorkspaceRootIntoToolExecutionContext() {
+        AgentTool tool = new StubTool("read");
+        RecordingToolExecutionService executionService = new RecordingToolExecutionService(ToolResult.ok("ok"));
+        Path workspaceRoot = Path.of("build/session-workspace");
+        ToolCallback callback = new SpringAiToolCallbackAdapter(
+                tool,
+                executionService,
+                AgentRunOptions.safeDefaults(),
+                workspaceRoot,
+                objectMapper,
+                SpringAiToolCallbackEvents.noop());
+
+        callback.call("{\"path\":\"README.md\"}");
+
+        assertThat(executionService.context().workspaceRoot()).isEqualTo(workspaceRoot.toAbsolutePath().normalize());
     }
 
     @Test
@@ -148,6 +169,7 @@ class SpringAiToolCallbackAdapterTest {
         assertThat(events.finishedCount()).isZero();
         assertThat(events.deniedCount()).isZero();
         assertThat(events.failedCount()).isEqualTo(1);
+        assertThat(events.failedCallId()).startsWith("tc_");
         assertThat(events.failedResult().error()).isTrue();
     }
 
@@ -295,6 +317,9 @@ class SpringAiToolCallbackAdapterTest {
         private int finishedCount;
         private int deniedCount;
         private int failedCount;
+        private String startedCallId;
+        private String finishedCallId;
+        private String failedCallId;
         private ToolResult finishedResult;
         private ToolResult failedResult;
 
@@ -304,9 +329,21 @@ class SpringAiToolCallbackAdapterTest {
         }
 
         @Override
+        public void toolCallStarted(String toolCallId, String toolName, ToolArguments arguments) {
+            startedCallId = toolCallId;
+            toolCallStarted(toolName, arguments);
+        }
+
+        @Override
         public void toolCallFinished(String toolName, ToolResult result) {
             finishedCount++;
             finishedResult = result;
+        }
+
+        @Override
+        public void toolCallFinished(String toolCallId, String toolName, ToolResult result) {
+            finishedCallId = toolCallId;
+            toolCallFinished(toolName, result);
         }
 
         @Override
@@ -315,9 +352,20 @@ class SpringAiToolCallbackAdapterTest {
         }
 
         @Override
+        public void toolCallDenied(String toolCallId, String toolName, ToolResult result) {
+            toolCallDenied(toolName, result);
+        }
+
+        @Override
         public void toolCallFailed(String toolName, ToolResult result) {
             failedCount++;
             failedResult = result;
+        }
+
+        @Override
+        public void toolCallFailed(String toolCallId, String toolName, ToolResult result) {
+            failedCallId = toolCallId;
+            toolCallFailed(toolName, result);
         }
 
         private int startedCount() {
@@ -338,6 +386,18 @@ class SpringAiToolCallbackAdapterTest {
 
         private ToolResult finishedResult() {
             return finishedResult;
+        }
+
+        private String startedCallId() {
+            return startedCallId;
+        }
+
+        private String finishedCallId() {
+            return finishedCallId;
+        }
+
+        private String failedCallId() {
+            return failedCallId;
         }
 
         private ToolResult failedResult() {

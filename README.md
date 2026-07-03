@@ -49,7 +49,7 @@ and replayable sessions for Java/Spring developers.
 
 ## Current Status
 
-현재는 `M6 Tool execution policy` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
+현재는 `M8 AgentRuntime + SSE` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
 
 M2에서는 아직 LLM tool calling, session store, AgentRuntime을 붙이지 않고 AgentRuntime 구현 전에 필요한 순수 도메인 타입만 추가했다.
 
@@ -102,7 +102,18 @@ M6에서는 Spring AI Tool Calling에 연결하지 않고, 내부 도구 실행 
 - `ToolPolicyDecision`, `ToolPolicy`, `DefaultToolPolicy`: read-only 기본 허용, write/bash 명시 옵션 요구, 공통 output truncation
 - `ToolExecutionService`: 정책 거부 시 실제 도구를 실행하지 않고 error `ToolResult` 반환, 허용 시 도구 실행 후 공통 후처리
 
-아직 AgentRuntime과 Spring AI tool adapter는 구현하지 않았다. 이들은 M7 이후 단계에서 순서대로 붙인다.
+M7에서는 내부 도구를 Spring AI Tool Calling에 직접 종속시키지 않고, 얇은 adapter로 연결했다.
+
+- `SpringAiToolCallbackAdapter`: 내부 `AgentTool`을 Spring AI `ToolCallback`으로 노출
+- `SpringAiToolCallbackFactory`: `AgentRunOptions`에 맞는 tool callback 목록 생성
+- `SpringAiToolCallbackEvents`: tool start/finish/denied/failed 이벤트를 런타임에 연결할 수 있는 hook
+
+M8에서는 세션 기반 prompt 처리와 SSE event stream을 추가했다.
+
+- `AgentRuntime`, `DefaultAgentRuntime`: user message append, model stream, assistant/tool message append, event emit 조율
+- `ModelClient`, `SpringAiModelClient`: runtime이 Spring AI `ChatClient`에 직접 묶이지 않도록 둔 얇은 model boundary
+- `AgentController`: `POST /api/sessions`, `POST /api/sessions/{sessionId}/messages/stream`
+- stream endpoint는 `agent_started`, `user_message_appended`, `assistant_delta`, `assistant_completed`, `agent_completed`와 tool event를 SSE로 보낸다.
 
 ## Run
 
@@ -154,4 +165,33 @@ Invoke-RestMethod `
 {"content":"..."}
 ```
 
-다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M7` 프롬프트를 기준으로 시작한다.
+## Agent Session API
+
+세션을 만들고, 같은 세션에 메시지를 보내면 agent event가 SSE로 흐른다.
+
+```powershell
+$session = Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8080/api/sessions" `
+  -ContentType "application/json" `
+  -Body '{"workspaceRoot":"."}'
+
+Invoke-WebRequest `
+  -Method Post `
+  -Uri "http://localhost:8080/api/sessions/$($session.sessionId)/messages/stream" `
+  -ContentType "application/json" `
+  -Headers @{ Accept = "text/event-stream" } `
+  -Body '{"text":"프로젝트 구조를 간단히 설명해줘","allowWrite":false,"allowBash":false}'
+```
+
+SSE 응답은 다음 형태다.
+
+```text
+event:agent_event
+id:e_...
+data:{"type":"agent_started",...}
+```
+
+메시지와 이벤트는 `agent.session.root` 아래 JSONL 파일로 append된다. 테스트는 fake runtime/model을 사용하므로 실제 외부 LLM API를 호출하지 않는다.
+
+다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M9` 프롬프트를 기준으로 시작한다.

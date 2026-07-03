@@ -2,6 +2,7 @@ package com.example.pispringai.tool.builtin;
 
 import com.example.pispringai.tool.AgentTool;
 import com.example.pispringai.tool.ToolArguments;
+import com.example.pispringai.tool.ToolExecutionContext;
 import com.example.pispringai.tool.ToolOutputLimiter;
 import com.example.pispringai.tool.ToolProperties;
 import com.example.pispringai.tool.ToolResult;
@@ -54,17 +55,23 @@ public class GrepTool implements AgentTool {
 
     @Override
     public ToolResult execute(ToolArguments arguments) {
+        return execute(arguments, ToolExecutionContext.safeDefaults());
+    }
+
+    @Override
+    public ToolResult execute(ToolArguments arguments, ToolExecutionContext context) {
         try {
             String query = arguments.requiredString("query");
-            Path root = pathResolver.resolveExisting(arguments.optionalString("path").orElse("."));
+            Path workspaceRoot = pathResolver.workspaceRoot(context.workspaceRoot());
+            Path root = pathResolver.resolveExisting(workspaceRoot, arguments.optionalString("path").orElse("."));
             if (!Files.isDirectory(root)) {
                 return ToolResult.error("path is not a directory: " + root);
             }
-            if (WorkspaceWalk.shouldSkipRoot(pathResolver.workspaceRoot(), root, secretFileGuard)) {
+            if (WorkspaceWalk.shouldSkipRoot(workspaceRoot, root, secretFileGuard)) {
                 return ToolResult.error("path is denied: " + root);
             }
 
-            SearchResult searchResult = search(root, query);
+            SearchResult searchResult = search(workspaceRoot, root, query);
             Map<String, Object> metadata = new LinkedHashMap<>();
             metadata.put("matches", searchResult.matches());
             metadata.put("skippedLargeFiles", searchResult.skippedLargeFiles());
@@ -75,7 +82,7 @@ public class GrepTool implements AgentTool {
         }
     }
 
-    private SearchResult search(Path root, String query) throws IOException {
+    private SearchResult search(Path workspaceRoot, Path root, String query) throws IOException {
         SearchAccumulator accumulator = new SearchAccumulator();
 
         WorkspaceWalk.walkRegularFiles(root, secretFileGuard, file -> {
@@ -97,7 +104,7 @@ public class GrepTool implements AgentTool {
                 return true;
             }
 
-            String relative = WorkspaceWalk.relativePath(pathResolver.workspaceRoot(), file);
+            String relative = WorkspaceWalk.relativePath(workspaceRoot, file);
             String[] fileLines = text.split("\\R", -1);
             for (int index = 0; index < fileLines.length
                     && accumulator.matches < workspaceProperties.maxGrepMatches(); index++) {

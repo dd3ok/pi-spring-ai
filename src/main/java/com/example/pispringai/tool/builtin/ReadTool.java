@@ -2,6 +2,7 @@ package com.example.pispringai.tool.builtin;
 
 import com.example.pispringai.tool.AgentTool;
 import com.example.pispringai.tool.ToolArguments;
+import com.example.pispringai.tool.ToolExecutionContext;
 import com.example.pispringai.tool.ToolOutputLimiter;
 import com.example.pispringai.tool.ToolProperties;
 import com.example.pispringai.tool.ToolResult;
@@ -52,9 +53,15 @@ public class ReadTool implements AgentTool {
 
     @Override
     public ToolResult execute(ToolArguments arguments) {
+        return execute(arguments, ToolExecutionContext.safeDefaults());
+    }
+
+    @Override
+    public ToolResult execute(ToolArguments arguments, ToolExecutionContext context) {
         try {
-            Path file = pathResolver.resolveExisting(arguments.requiredString("path"));
-            secretFileGuard.assertAllowed(pathResolver.workspaceRoot().relativize(file));
+            Path workspaceRoot = pathResolver.workspaceRoot(context.workspaceRoot());
+            Path file = pathResolver.resolveExisting(workspaceRoot, arguments.requiredString("path"));
+            secretFileGuard.assertAllowed(workspaceRoot.relativize(file));
             if (!Files.isRegularFile(file)) {
                 return ToolResult.error("path is not a regular file: " + file);
             }

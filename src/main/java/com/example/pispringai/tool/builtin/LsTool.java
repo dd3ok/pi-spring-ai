@@ -2,6 +2,7 @@ package com.example.pispringai.tool.builtin;
 
 import com.example.pispringai.tool.AgentTool;
 import com.example.pispringai.tool.ToolArguments;
+import com.example.pispringai.tool.ToolExecutionContext;
 import com.example.pispringai.tool.ToolOutputLimiter;
 import com.example.pispringai.tool.ToolProperties;
 import com.example.pispringai.tool.ToolResult;
@@ -53,8 +54,14 @@ public class LsTool implements AgentTool {
 
     @Override
     public ToolResult execute(ToolArguments arguments) {
+        return execute(arguments, ToolExecutionContext.safeDefaults());
+    }
+
+    @Override
+    public ToolResult execute(ToolArguments arguments, ToolExecutionContext context) {
         try {
-            Path directory = pathResolver.resolveExisting(arguments.optionalString("path").orElse("."));
+            Path workspaceRoot = pathResolver.workspaceRoot(context.workspaceRoot());
+            Path directory = pathResolver.resolveExisting(workspaceRoot, arguments.optionalString("path").orElse("."));
             if (!Files.isDirectory(directory)) {
                 return ToolResult.error("path is not a directory: " + directory);
             }
@@ -62,7 +69,7 @@ public class LsTool implements AgentTool {
             List<Path> entries;
             try (var stream = Files.list(directory)) {
                 entries = stream
-                        .filter(path -> !secretFileGuard.isDenied(pathResolver.workspaceRoot().relativize(path)))
+                        .filter(path -> !secretFileGuard.isDenied(workspaceRoot.relativize(path)))
                         .sorted(Comparator.comparing(path -> path.getFileName().toString()))
                         .toList();
             }
