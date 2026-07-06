@@ -83,6 +83,20 @@ class BashToolTest {
     }
 
     @Test
+    void returnsPartialOutputWhenTimedOutCommandIsDestroyed() {
+        BashTool tool = newTool(2_000, 1);
+
+        ToolResult result = tool.execute(
+                args(partialOutputThenSleepCommand("started", 5)),
+                new ToolExecutionContext(allowBashOptions(), workspace));
+
+        assertThat(result.error()).isTrue();
+        assertThat(result.text()).contains("timed out", "started");
+        assertThat(result.metadata()).containsEntry("timedOut", true);
+        assertThat((Long) result.metadata().get("stdoutBytes")).isGreaterThanOrEqualTo(7L);
+    }
+
+    @Test
     void limitsCommandOutput() {
         BashTool tool = newTool(4, 30);
 
@@ -164,6 +178,13 @@ class BashToolTest {
         return isWindows()
                 ? "powershell -NoProfile -Command \"[Console]::Out.Write('" + text + "')\""
                 : "printf '" + text + "'";
+    }
+
+    private static String partialOutputThenSleepCommand(String text, int seconds) {
+        return isWindows()
+                ? "powershell -NoProfile -Command \"[Console]::Out.Write('" + text
+                        + "'); [Console]::Out.Flush(); Start-Sleep -Seconds " + seconds + "\""
+                : "printf '" + text + "'; sleep " + seconds;
     }
 
     private static String createFileCommand(String name) {

@@ -16,7 +16,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Duration;
@@ -25,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -41,6 +41,7 @@ public class BashTool implements AgentTool {
             false);
 
     private static final boolean WINDOWS = File.separatorChar == '\\';
+    private static final Executor STREAM_READER_EXECUTOR = command -> Thread.startVirtualThread(command);
 
     private final SafePathResolver pathResolver;
     private final BashCommandPolicy commandPolicy;
@@ -91,31 +92,38 @@ public class BashTool implements AgentTool {
         Process process = new ProcessBuilder(shellCommand(command))
                 .directory(workspaceRoot.toFile())
                 .start();
-        CompletableFuture<LimitedStream> stdout = readAsync(process.getInputStream());
-        CompletableFuture<LimitedStream> stderr = readAsync(process.getErrorStream());
-        Instant startedAt = Instant.now();
-        boolean finished = process.waitFor(toolProperties.bashTimeoutSeconds(), TimeUnit.SECONDS);
-        boolean timedOut = !finished;
-        int exitCode = -1;
-        if (timedOut) {
-            destroyProcessTree(process);
-        } else {
-            exitCode = process.exitValue();
-        }
+        process.getOutputStream().close();
 
-        LimitedStream stdoutText = stdout.get(2, TimeUnit.SECONDS);
-        LimitedStream stderrText = stderr.get(2, TimeUnit.SECONDS);
-        long durationMillis = Duration.between(startedAt, Instant.now()).toMillis();
-        Map<String, Object> metadata = metadata(
-                command,
-                workspaceRoot,
-                exitCode,
-                timedOut,
-                durationMillis,
-                stdoutText,
-                stderrText);
-        String text = resultText(exitCode, timedOut, stdoutText.text(), stderrText.text());
-        return limitedResult(text, timedOut || exitCode != 0, metadata);
+        try (InputStream stdoutStream = process.getInputStream();
+                InputStream stderrStream = process.getErrorStream()) {
+            CompletableFuture<LimitedStream> stdout = readAsync(stdoutStream);
+            CompletableFuture<LimitedStream> stderr = readAsync(stderrStream);
+            Instant startedAt = Instant.now();
+            boolean finished = process.waitFor(toolProperties.bashTimeoutSeconds(), TimeUnit.SECONDS);
+            boolean timedOut = !finished;
+            int exitCode = -1;
+            if (timedOut) {
+                destroyProcessTree(process);
+                closeQuietly(stdoutStream);
+                closeQuietly(stderrStream);
+            } else {
+                exitCode = process.exitValue();
+            }
+
+            LimitedStream stdoutText = stdout.get(2, TimeUnit.SECONDS);
+            LimitedStream stderrText = stderr.get(2, TimeUnit.SECONDS);
+            long durationMillis = Duration.between(startedAt, Instant.now()).toMillis();
+            Map<String, Object> metadata = metadata(
+                    command,
+                    workspaceRoot,
+                    exitCode,
+                    timedOut,
+                    durationMillis,
+                    stdoutText,
+                    stderrText);
+            String text = resultText(exitCode, timedOut, stdoutText.text(), stderrText.text());
+            return limitedResult(text, timedOut || exitCode != 0, metadata);
+        }
     }
 
     private ToolResult limitedResult(String text, boolean error, Map<String, Object> metadata) {
@@ -166,32 +174,32 @@ public class BashTool implements AgentTool {
     }
 
     private CompletableFuture<LimitedStream> readAsync(InputStream stream) {
-        return CompletableFuture.supplyAsync(() -> {
-            try {
-                return readLimited(stream, toolProperties.maxToolOutputChars());
-            } catch (IOException exception) {
-                throw new UncheckedIOException(exception);
-            }
-        });
+        return CompletableFuture.supplyAsync(
+                () -> readLimited(stream, toolProperties.maxToolOutputChars()),
+                STREAM_READER_EXECUTOR);
     }
 
-    private static LimitedStream readLimited(InputStream stream, int limitBytes) throws IOException {
+    private static LimitedStream readLimited(InputStream stream, int limitBytes) {
         int limit = Math.max(1, limitBytes);
         ByteArrayOutputStream output = new ByteArrayOutputStream(Math.min(limit, 8192));
         byte[] chunk = new byte[4096];
         long bytesRead = 0;
         boolean truncated = false;
-        int read;
-        while ((read = stream.read(chunk)) >= 0) {
-            bytesRead += read;
-            int remaining = limit - output.size();
-            if (remaining > 0) {
-                int stored = Math.min(read, remaining);
-                output.write(chunk, 0, stored);
-                truncated = truncated || stored < read;
-            } else {
-                truncated = true;
+        try {
+            int read;
+            while ((read = stream.read(chunk)) >= 0) {
+                bytesRead += read;
+                int remaining = limit - output.size();
+                if (remaining > 0) {
+                    int stored = Math.min(read, remaining);
+                    output.write(chunk, 0, stored);
+                    truncated = truncated || stored < read;
+                } else {
+                    truncated = true;
+                }
             }
+        } catch (IOException exception) {
+            truncated = true;
         }
         return new LimitedStream(
                 output.toString(StandardCharsets.UTF_8),
@@ -214,10 +222,18 @@ public class BashTool implements AgentTool {
         process.waitFor(2, TimeUnit.SECONDS);
     }
 
+    private static void closeQuietly(InputStream stream) {
+        try {
+            stream.close();
+        } catch (IOException ignored) {
+            // Closing on timeout is best-effort; partial output is still returned by the reader.
+        }
+    }
+
     private static String exceptionMessage(Exception exception) {
         Throwable cause = exception.getCause();
-        if (cause instanceof UncheckedIOException uncheckedIOException) {
-            return uncheckedIOException.getCause().getMessage();
+        if (cause != null && cause.getMessage() != null && !cause.getMessage().isBlank()) {
+            return cause.getMessage();
         }
         String message = exception.getMessage();
         return message == null || message.isBlank()

@@ -14,10 +14,12 @@ public class BashCommandPolicy {
             Pattern.compile("\\bgit\\s+clean\\b(?=.*-(?:\\S*f\\S*d|\\S*d\\S*f)).*");
     private static final Pattern GIT_CLEAN_SPLIT_FORCE_DIRECTORY =
             Pattern.compile("\\bgit\\s+clean\\b(?=.*\\s-f\\b)(?=.*\\s-d\\b).*");
+    private static final Pattern GIT_RESET_HARD =
+            Pattern.compile("\\bgit\\s+reset\\b.*\\s--hard\\b");
     private static final Pattern REMOTE_SCRIPT_PIPE =
             Pattern.compile("\\b(?:curl|wget)\\b.*\\|\\s*(?:sh|bash)\\b");
     private static final Pattern SHUTDOWN_OR_REBOOT =
-            Pattern.compile("(?:^|[;&|]\\s*)(?:shutdown(?:\\.exe)?|reboot)\\b");
+            Pattern.compile("(?:^|[;&|]\\s*)(?:shutdown(?:\\.exe)?|reboot|poweroff|halt|init\\s+[06])\\b");
     private static final Pattern WINDOWS_DELETE_RECURSIVE =
             Pattern.compile("\\b(?:del|erase|rd|rmdir)\\b.*\\s/s\\b");
 
@@ -29,7 +31,9 @@ public class BashCommandPolicy {
             "id_dsa",
             "id_ecdsa",
             "id_ed25519",
-            "secrets.");
+            "secrets.",
+            "application-prod",
+            ".git");
 
     public ToolPolicyDecision validate(String command) {
         if (command == null || command.isBlank()) {
@@ -49,7 +53,7 @@ public class BashCommandPolicy {
     private static boolean isDestructive(String normalized) {
         return RM_RECURSIVE_FORCE.matcher(normalized).find()
                 || RM_SPLIT_RECURSIVE_FORCE.matcher(normalized).find()
-                || normalized.contains("git reset --hard")
+                || GIT_RESET_HARD.matcher(normalized).find()
                 || GIT_CLEAN_FORCE_DIRECTORY.matcher(normalized).find()
                 || GIT_CLEAN_SPLIT_FORCE_DIRECTORY.matcher(normalized).find()
                 || REMOTE_SCRIPT_PIPE.matcher(normalized).find()
