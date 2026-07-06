@@ -84,10 +84,10 @@ class BashToolTest {
 
     @Test
     void returnsPartialOutputWhenTimedOutCommandIsDestroyed() {
-        BashTool tool = newTool(2_000, 1);
+        BashTool tool = newTool(2_000, 3);
 
         ToolResult result = tool.execute(
-                args(partialOutputThenSleepCommand("started", 5)),
+                args(partialOutputThenSleepCommand("started", 8)),
                 new ToolExecutionContext(allowBashOptions(), workspace));
 
         assertThat(result.error()).isTrue();
@@ -182,8 +182,7 @@ class BashToolTest {
 
     private static String partialOutputThenSleepCommand(String text, int seconds) {
         return isWindows()
-                ? "powershell -NoProfile -Command \"[Console]::Out.Write('" + text
-                        + "'); [Console]::Out.Flush(); Start-Sleep -Seconds " + seconds + "\""
+                ? "echo " + text + " & ping -n " + (seconds + 1) + " 127.0.0.1 > nul"
                 : "printf '" + text + "'; sleep " + seconds;
     }
 
