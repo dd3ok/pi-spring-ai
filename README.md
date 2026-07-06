@@ -49,7 +49,7 @@ and replayable sessions for Java/Spring developers.
 
 ## Current Status
 
-현재는 `M9 Write/Edit tools` 단계까지 구현했다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
+현재는 `M10 Bash tool` 단계까지 구현했다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
 
 M2에서는 아직 LLM tool calling, session store, AgentRuntime을 붙이지 않고 AgentRuntime 구현 전에 필요한 순수 도메인 타입만 추가했다.
 
@@ -120,6 +120,13 @@ M9에서는 명시적으로 `allowWrite=true`일 때만 실행되는 write/edit 
 - `WriteTool`: workspace 내부 UTF-8 텍스트 파일 생성과 명시적 overwrite 지원. secret, traversal, missing parent를 차단
 - `EditTool`: workspace 내부 UTF-8 텍스트 파일에서 `oldText`가 정확히 한 번 매칭될 때만 치환. secret, traversal, large/binary file을 차단
 - `ToolRegistry`: `allowWrite=true` 옵션에서 `write`, `edit` 도구를 활성화
+
+M10에서는 명시적으로 `allowBash=true`일 때만 실행되는 `bash` built-in tool을 추가했다.
+
+- `BashTool`: workspace root를 working directory로 고정하고 shell command를 실행. Windows에서는 `cmd.exe /c`, Unix 계열에서는 `/bin/sh -c`를 사용
+- `BashCommandPolicy`: `rm -rf`, `git reset --hard`, `git clean -fd`, `shutdown`, `reboot`, `curl ... | sh`, `wget ... | sh`, secret path 참조를 기본 차단
+- `ToolProperties`: `agent.tools.bash-timeout-seconds` 기본 30초와 `max-tool-output-chars` 기반 출력 제한 적용
+- `ToolRegistry`: `allowBash=true` 옵션에서만 `bash` tool을 활성화
 
 ## Run
 
@@ -200,4 +207,6 @@ data:{"type":"agent_started",...}
 
 메시지와 이벤트는 `agent.session.root` 아래 JSONL 파일로 append된다. 테스트는 fake runtime/model을 사용하므로 실제 외부 LLM API를 호출하지 않는다.
 
-다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M10` 프롬프트를 기준으로 시작한다.
+Bash 실행은 기본적으로 비활성화되어 있다. 필요한 경우에만 request body에서 `allowBash:true`를 명시한다. 이때도 destructive command denylist, timeout, 출력 제한이 적용된다.
+
+다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M11` 프롬프트를 기준으로 시작한다.

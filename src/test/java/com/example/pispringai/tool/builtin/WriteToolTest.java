@@ -152,7 +152,7 @@ class WriteToolTest {
     }
 
     private static ToolExecutionService service() {
-        return new ToolExecutionService(new DefaultToolPolicy(new ToolProperties(200)));
+        return new ToolExecutionService(new DefaultToolPolicy(new ToolProperties(200, 30)));
     }
 
     private static AgentRunOptions allowWriteOptions() {

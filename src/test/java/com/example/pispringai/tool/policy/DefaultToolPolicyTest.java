@@ -18,7 +18,7 @@ class DefaultToolPolicyTest {
 
     private static final ToolArguments NO_ARGUMENTS = new ToolArguments(Map.of());
 
-    private final ToolPolicy policy = new DefaultToolPolicy(new ToolProperties(5));
+    private final ToolPolicy policy = new DefaultToolPolicy(new ToolProperties(5, 30));
 
     @Test
     void allowsReadOnlyToolWithSafeDefaults() {

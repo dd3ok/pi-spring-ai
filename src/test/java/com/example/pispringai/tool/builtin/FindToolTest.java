@@ -92,7 +92,7 @@ class FindToolTest {
         return new FindTool(
                 new SafePathResolver(workspaceProperties),
                 new SecretFileGuard(),
-                new ToolProperties(maxOutputChars));
+                new ToolProperties(maxOutputChars, 30));
     }
 
     private static ToolArguments args(String pattern, String path) {

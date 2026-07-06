@@ -86,7 +86,7 @@ class ReadToolTest {
                 new SafePathResolver(workspaceProperties),
                 new SecretFileGuard(),
                 workspaceProperties,
-                new ToolProperties(200));
+                new ToolProperties(200, 30));
 
         ToolResult result = tool.execute(args("README.md"));
 
@@ -105,7 +105,7 @@ class ReadToolTest {
                 new SafePathResolver(workspaceProperties),
                 new SecretFileGuard(),
                 workspaceProperties,
-                new ToolProperties(200));
+                new ToolProperties(200, 30));
 
         ToolResult result = tool.execute(
                 args("README.md"),
@@ -121,7 +121,7 @@ class ReadToolTest {
                 new SafePathResolver(workspaceProperties),
                 new SecretFileGuard(),
                 workspaceProperties,
-                new ToolProperties(maxOutputChars));
+                new ToolProperties(maxOutputChars, 30));
     }
 
     private static ToolArguments args(String path) {

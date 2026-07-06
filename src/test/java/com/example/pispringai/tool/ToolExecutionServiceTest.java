@@ -84,7 +84,7 @@ class ToolExecutionServiceTest {
     }
 
     private static ToolExecutionService serviceWithMaxOutputChars(int maxOutputChars) {
-        return new ToolExecutionService(new DefaultToolPolicy(new ToolProperties(maxOutputChars)));
+        return new ToolExecutionService(new DefaultToolPolicy(new ToolProperties(maxOutputChars, 30)));
     }
 
     private static final class CountingTool implements AgentTool {
