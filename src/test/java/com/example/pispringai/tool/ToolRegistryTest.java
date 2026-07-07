@@ -114,6 +114,26 @@ class ToolRegistryTest {
                 });
     }
 
+    @Test
+    void springRegistryIncludesBashToolWhenAllowBashIsTrue() {
+        contextRunner
+                .withPropertyValues("agent.workspace.root=.")
+                .run(context -> {
+                    ToolRegistry registry = context.getBean(ToolRegistry.class);
+                    AgentRunOptions allowBash = new AgentRunOptions(
+                            false,
+                            true,
+                            6,
+                            12,
+                            Duration.ofSeconds(120));
+
+                    assertThat(registry.enabledTools(allowBash))
+                            .extracting(tool -> tool.spec().name())
+                            .containsExactlyInAnyOrder("ls", "read", "find", "grep", "bash");
+                    assertThat(registry.get("bash").spec().safetyLevel()).isEqualTo(ToolSafetyLevel.BASH);
+                });
+    }
+
     private record StubTool(String name, ToolSafetyLevel safetyLevel, boolean enabledByDefault) implements AgentTool {
 
         private StubTool(String name) {
