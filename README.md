@@ -1,150 +1,80 @@
 # pi-spring-ai
 
-`pi-spring-ai` is a small, Pi-inspired coding agent harness built with Spring AI.
-It focuses on a readable tool-use loop, safe workspace tools, event streaming,
-and replayable sessions for Java/Spring developers.
+`pi-spring-ai` is a small, Pi-inspired coding agent harness built with Java 21,
+Spring Boot, and Spring AI.
 
-한국어로는 Spring AI로 만든 작은 코딩 에이전트 하네스다. 단순 챗봇이 아니라, LLM이 안전한 도구를 호출하고 그 과정을 이벤트와 세션으로 남기는 구조를 학습하기 위한 프로젝트다.
+한국어로는 Spring AI로 만든 작은 코딩 에이전트 하네스다. 단순 챗봇이 아니라,
+LLM이 안전한 workspace 도구를 호출하고 그 과정을 SSE event와 JSONL session
+history로 남기는 구조를 Java/Spring 개발자가 읽고 설명할 수 있게 만든 프로젝트다.
 
-## Repository Baseline
+## 현재 상태
 
-이 저장소의 제품/프로젝트 이름과 GitHub 저장소 이름은 모두 `pi-spring-ai`로 둔다. 문서와 코드의 애플리케이션 이름도 같은 이름을 기준으로 한다.
-
-기준 문서는 다음 파일이다.
-
-- `AGENTS.md`
-- `docs/01_SOT.md`
-- `docs/02_DESIGN.md`
-- `docs/03_IMPLEMENTATION_PLAN.md`
-- `docs/04_CODEX_TASK_PROMPTS.md`
-- `docs/05_BLOG_SERIES_PLAN.md`
-
-루트의 `01_SOT.md` 같은 중복 문서는 초기 작업 묶음의 사본이므로 추적하지 않는다. 앞으로 수정은 `docs/` 아래 문서에만 한다.
-
-## Working Style
-
-한 번에 하나의 마일스톤만 구현한다. 각 마일스톤은 다음 산출물을 남긴다.
-
-- 작게 동작하는 코드 또는 실행 가능한 데모
-- 외부 LLM API 없이 통과하는 테스트
-- README 또는 docs의 짧은 변경 기록
-- 블로그 글에 넣을 수 있는 의사결정 메모
-
-커밋 단위도 마일스톤에 맞춘다. 예를 들어 `M0 Project bootstrap`, `M1 ChatClient hello`, `M4 Workspace guard`처럼 나눈다.
-
-## MVP Order
-
-1. M0 Project bootstrap
-2. M1 ChatClient hello
-3. M2 Agent domain model
-4. M3 JSONL session store
-5. M4 Workspace guard
-6. M5 Read-only tools
-7. M6 Tool execution policy
-8. M7 Spring AI tool adapter
-9. M8 AgentRuntime + SSE
-10. M9 Write/Edit tools
-11. M10 Bash tool
-12. M11 README/demo polish
-
-## Current Status
-
-현재는 `M10 Bash tool` 단계까지 구현했다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
-
-M2에서는 아직 LLM tool calling, session store, AgentRuntime을 붙이지 않고 AgentRuntime 구현 전에 필요한 순수 도메인 타입만 추가했다.
-
-- `AgentMessage`: `UserMessage`, `AssistantMessage`, `ToolResultMessage`
-- `AgentEvent`: lifecycle, assistant, tool call, denial, error event
-- `AgentRunOptions`: read-only safe defaults
-- `AgentPromptCommand`: session/workspace/user prompt command
-- `IdGenerator`: session/message/event/tool-call ID 생성
-
-M3에서는 API/SSE나 AgentRuntime에 연결하지 않고, 파일 기반 세션 저장소만 추가했다.
-
-- `SessionStore`: 세션 생성, 조회, 메시지 append/load, 이벤트 append/load
-- `JsonlSessionStore`: `.pi-spring-ai/sessions/{sessionId}/` 아래 `session.json`, `messages.jsonl`, `events.jsonl` 저장
-- `messages.jsonl`: `kind` discriminator가 있는 flat concrete message JSON
-- `events.jsonl`: `type` discriminator가 있는 flat concrete event JSON
-- 알 수 없는 discriminator, malformed JSONL, 없는 session, sessionId path traversal, 손상된 `session.json`은 명시적으로 실패
-
-M4에서는 아직 read/ls/find/grep 도구를 만들지 않고, 앞으로 파일 도구가 공통으로 사용할 workspace guard만 추가했다.
-
-- `WorkspaceProperties`: `agent.workspace.root`를 절대경로로 정규화하고 read/list/grep 제한 기본값을 유지
-- `SafePathResolver`: 사용자 입력 경로를 workspace root 안으로만 resolve
-- `resolveExisting`: 존재하는 파일/디렉터리는 real path 기준으로 검사해서 symlink escape를 차단
-- `resolveForFuturePath`: 나중에 write 계층에서 새 경로에만 쓸 수 있도록 존재하는 parent real path 기준 검증 제공
-- `SecretFileGuard`: `.env`, `.env.*`, `*.pem`, `*.key`, `id_rsa`, `id_dsa`, `id_ecdsa`, `id_ed25519`, `.git`, `application-prod.yml`, `application-prod.yaml`, `application-prod.properties`, `secrets.*` 차단
-
-선택한 초기 버전과 의존성은 다음과 같다.
+M0부터 M10까지 구현되어 있다.
 
 - Java 21 toolchain with `--release 21`
 - Spring Boot 4.1.0
 - Spring AI BOM 2.0.0
-- Spring WebFlux: 이후 SSE endpoint를 위한 웹 기반
-- Spring Boot Actuator: M0에서 `/actuator/health`로 애플리케이션 시작 상태를 확인하기 위한 최소 health endpoint
-- Spring AI Google GenAI starter: Gemini를 기본 chat provider로 쓰기 위한 model starter
-- Spring AI OpenAI starter: OpenAI provider 전환 예제를 유지하기 위한 model starter
+- Spring WebFlux 기반 SSE endpoint
+- Gemini Google GenAI 기본 provider, OpenAI provider 전환 경로
+- JSONL file 기반 session store
+- Spring AI `ToolCallback` adapter
+- `AgentRuntime` + SSE event stream
+- built-in tools: `ls`, `read`, `find`, `grep`, `write`, `edit`, `bash`
+- `ToolRegistry`, `ToolExecutionService`, `ToolPolicy` 기반 safety gate
 
-M5에서는 Spring AI Tool Calling에 연결하지 않고, 내부 read-only built-in tools만 추가했다.
+테스트는 외부 LLM API를 호출하지 않는다. API key가 없어도 `./gradlew test`가
+통과해야 하며, 테스트에서는 fake runtime/model 또는 dummy key만 사용한다.
 
-- `AgentTool`: 내부 도구의 최소 계약. M5에서는 `execute(ToolArguments)` 형태로 시작
-- `ToolSpec`, `ToolArguments`, `ToolResult`: 도구 설명, 입력, 결과 모델
-- `ToolRegistry`: 등록된 도구 조회와 `AgentRunOptions` 기반 safety level 필터링
-- `LsTool`: workspace 내부 디렉터리 목록. secret entry 제외, 항목 수와 출력 길이 제한
-- `ReadTool`: workspace 내부 UTF-8 텍스트 파일 읽기. secret, traversal, large/binary file 차단
-- `FindTool`: workspace 내부 파일 glob 검색. `.git`, `build`, `.gradle`, secret path 제외
-- `GrepTool`: workspace 내부 텍스트 파일 literal substring 검색. secret 제외, large/binary file skip
+## 구조
 
-M6에서는 Spring AI Tool Calling에 연결하지 않고, 내부 도구 실행 전후 정책과 공통 executor만 추가했다.
-
-- `ToolSafetyLevel`: `READ_ONLY`, `WRITE`, `BASH` 등급
-- `ToolExecutionContext`: 실행 시점의 `AgentRunOptions` 전달
-- `ToolPolicyDecision`, `ToolPolicy`, `DefaultToolPolicy`: read-only 기본 허용, write/bash 명시 옵션 요구, 공통 output truncation
-- `ToolExecutionService`: 정책 거부 시 실제 도구를 실행하지 않고 error `ToolResult` 반환, 허용 시 도구 실행 후 공통 후처리
-
-M7에서는 내부 도구를 Spring AI Tool Calling에 직접 종속시키지 않고, 얇은 adapter로 연결했다.
-
-- `SpringAiToolCallbackAdapter`: 내부 `AgentTool`을 Spring AI `ToolCallback`으로 노출
-- `SpringAiToolCallbackFactory`: `AgentRunOptions`에 맞는 tool callback 목록 생성
-- `SpringAiToolCallbackEvents`: tool start/finish/denied/failed 이벤트를 런타임에 연결할 수 있는 hook
-
-M8에서는 세션 기반 prompt 처리와 SSE event stream을 추가했다.
-
-- `AgentRuntime`, `DefaultAgentRuntime`: user message append, model stream, assistant/tool message append, event emit 조율
-- `ModelClient`, `SpringAiModelClient`: runtime이 Spring AI `ChatClient`에 직접 묶이지 않도록 둔 얇은 model boundary
-- `AgentController`: `POST /api/sessions`, `POST /api/sessions/{sessionId}/messages/stream`
-- stream endpoint는 `agent_started`, `user_message_appended`, `assistant_delta`, `assistant_completed`, `agent_completed`와 tool event를 SSE로 보낸다.
-
-M9에서는 명시적으로 `allowWrite=true`일 때만 실행되는 write/edit built-in tools를 추가했다.
-
-- `WriteTool`: workspace 내부 UTF-8 텍스트 파일 생성과 명시적 overwrite 지원. secret, traversal, missing parent를 차단
-- `EditTool`: workspace 내부 UTF-8 텍스트 파일에서 `oldText`가 정확히 한 번 매칭될 때만 치환. secret, traversal, large/binary file을 차단
-- `ToolRegistry`: `allowWrite=true` 옵션에서 `write`, `edit` 도구를 활성화
-
-M10에서는 명시적으로 `allowBash=true`일 때만 실행되는 `bash` built-in tool을 추가했다.
-
-- `BashTool`: workspace root를 working directory로 고정하고 shell command를 실행. Windows에서는 `cmd.exe /c`, Unix 계열에서는 `/bin/sh -c`를 사용
-- `BashCommandPolicy`: `rm -rf`, `git reset --hard`, `git clean -fd`, `shutdown`, `reboot`, `curl ... | sh`, `wget ... | sh`, secret path 참조를 기본 차단
-- `ToolProperties`: `agent.tools.bash-timeout-seconds` 기본 30초와 `max-tool-output-chars` 기반 출력 제한 적용
-- `ToolRegistry`: `allowBash=true` 옵션에서만 `bash` tool을 활성화
-
-## Run
-
-```bash
-./gradlew test
+```text
+Client
+  -> POST /api/sessions
+  -> POST /api/sessions/{sessionId}/messages/stream
+  -> AgentRuntime
+  -> ModelClient
+  -> Spring AI ChatClient
+  -> SpringAiToolCallbackAdapter
+  -> ToolExecutionService
+  -> ToolPolicy
+  -> built-in tool
+  -> AgentEvent SSE + JSONL session history
 ```
 
-Windows PowerShell에서는 다음처럼 실행한다.
+패키지 역할은 작게 나뉜다.
 
-```powershell
-.\gradlew.bat test
+| 패키지 | 역할 |
+|---|---|
+| `agent` | `AgentRuntime`, run options, prompt command, event/message domain |
+| `api` | REST/SSE controller와 request/response DTO |
+| `model` | Spring AI `ChatClient` wrapper와 tool callback adapter |
+| `session` | JSONL session store |
+| `tool` | built-in tools, registry, execution service, policy |
+| `workspace` | workspace root, safe path resolver, secret file guard |
+
+## 설정
+
+주요 기본값은 `src/main/resources/application.yml`에 있다.
+
+```yaml
+agent:
+  workspace:
+    root: .
+    max-read-bytes: 200000
+    max-directory-entries: 200
+    max-grep-matches: 100
+  tools:
+    write-enabled-by-default: false
+    bash-enabled-by-default: false
+    bash-timeout-seconds: 30
+    max-tool-output-chars: 20000
+  session:
+    root: .pi-spring-ai/sessions
 ```
 
-테스트는 실제 외부 LLM API를 호출하지 않는다. 컨트롤러 테스트는 fake model service를 사용하고, Spring context 테스트는 Google GenAI auto-configuration을 통과시키기 위한 테스트용 dummy API key만 사용한다.
+실제 모델 호출에는 provider별 API key가 필요하다.
 
-## Chat API
-
-실제 `/api/chat` endpoint는 기본적으로 Gemini Google GenAI provider를 사용한다. Gemini API key는 Google AI Studio에서 만들 수 있고, 로컬 실행 시 `GEMINI_API_KEY` 또는 `GOOGLE_API_KEY`로 전달한다.
+Gemini 기본 실행:
 
 ```powershell
 $env:GEMINI_API_KEY = "your-gemini-api-key"
@@ -152,7 +82,7 @@ $env:GEMINI_MODEL = "gemini-2.5-flash"
 .\gradlew.bat bootRun
 ```
 
-OpenAI로 전환하려면 provider와 OpenAI key를 같이 지정한다.
+OpenAI로 전환:
 
 ```powershell
 $env:AGENT_MODEL_PROVIDER = "openai"
@@ -162,7 +92,28 @@ $env:AGENT_MODEL_NAME = "gpt-4.1-mini"
 .\gradlew.bat bootRun
 ```
 
-요청 예시는 다음과 같다.
+macOS/Linux에서는 같은 환경 변수를 export한 뒤 `./gradlew bootRun`을 실행한다.
+
+## 테스트
+
+```bash
+./gradlew test
+```
+
+Windows PowerShell:
+
+```powershell
+.\gradlew.bat test
+```
+
+이 명령은 로컬 테스트만 실행한다. 실제 Gemini/OpenAI API를 호출하지 않아야 한다.
+
+## API 사용법
+
+### Chat API
+
+`/api/chat`은 가장 작은 Spring AI chat endpoint다. session, tool, SSE 흐름을
+거치지 않는 단순 호출 확인용이다.
 
 ```powershell
 Invoke-RestMethod `
@@ -172,15 +123,16 @@ Invoke-RestMethod `
   -Body '{"text":"hello"}'
 ```
 
-응답 형태:
+응답:
 
 ```json
 {"content":"..."}
 ```
 
-## Agent Session API
+### Session 생성
 
-세션을 만들고, 같은 세션에 메시지를 보내면 agent event가 SSE로 흐른다.
+agent 흐름은 session을 먼저 만든다. `workspaceRoot`는 agent가 접근할 수 있는
+프로젝트 루트다.
 
 ```powershell
 $session = Invoke-RestMethod `
@@ -189,6 +141,24 @@ $session = Invoke-RestMethod `
   -ContentType "application/json" `
   -Body '{"workspaceRoot":"."}'
 
+$session
+```
+
+응답:
+
+```json
+{
+  "sessionId": "s_...",
+  "workspaceRoot": "C:\\path\\to\\project"
+}
+```
+
+### Message stream
+
+같은 session에 메시지를 보내면 `text/event-stream`으로 agent event가 흐른다.
+`allowWrite`와 `allowBash`는 request 단위 옵션이며, 생략하면 둘 다 `false`다.
+
+```powershell
 Invoke-WebRequest `
   -Method Post `
   -Uri "http://localhost:8080/api/sessions/$($session.sessionId)/messages/stream" `
@@ -205,8 +175,154 @@ id:e_...
 data:{"type":"agent_started",...}
 ```
 
-메시지와 이벤트는 `agent.session.root` 아래 JSONL 파일로 append된다. 테스트는 fake runtime/model을 사용하므로 실제 외부 LLM API를 호출하지 않는다.
+현재 외부 session 조회 API는 만들지 않았다. history는 session root 아래 JSONL
+파일로 확인한다.
 
-Bash 실행은 기본적으로 비활성화되어 있다. 필요한 경우에만 request body에서 `allowBash:true`를 명시한다. 이때도 destructive command denylist, timeout, 출력 제한이 적용된다.
+```text
+.pi-spring-ai/sessions/{sessionId}/
+  session.json
+  messages.jsonl
+  events.jsonl
+```
 
-다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M11` 프롬프트를 기준으로 시작한다.
+JSONL이 중요한 이유는 단순하다. agent가 어떤 user message를 받았고, 어떤 tool을
+호출했고, 어떤 결과와 event를 남겼는지 사람이 직접 열어 replay할 수 있다. SSE는
+실시간 관찰용이고, JSONL은 이후 디버깅과 포트폴리오 설명용 기록이다.
+
+## Built-in tools
+
+| Tool | 기본 활성 | 활성 조건 | 입력 예시 | 설명 |
+|---|---:|---|---|---|
+| `ls` | yes | 항상 | `{"path":"."}` | workspace 내부 디렉터리 목록 |
+| `read` | yes | 항상 | `{"path":"README.md"}` | UTF-8 텍스트 파일 읽기 |
+| `find` | yes | 항상 | `{"pattern":"*.java","path":"src"}` | glob 기반 파일 검색 |
+| `grep` | yes | 항상 | `{"query":"AgentRuntime","path":"src"}` | literal substring 검색 |
+| `write` | no | `allowWrite=true` | `{"path":"docs/demo.md","content":"...","overwrite":false}` | UTF-8 텍스트 파일 쓰기 |
+| `edit` | no | `allowWrite=true` | `{"path":"README.md","oldText":"...","newText":"..."}` | 정확히 한 번 매칭되는 텍스트 치환 |
+| `bash` | no | `allowBash=true` | `{"command":"./gradlew test"}` | workspace root에서 shell command 실행 |
+
+`ToolRegistry`는 `AgentRunOptions`를 보고 모델에 노출할 tool 목록을 고른다.
+`ToolExecutionService`는 실제 실행 직전에 `ToolPolicy`를 한 번 더 통과시킨다.
+따라서 모델이 어떤 경로로든 `write`, `edit`, `bash` 실행을 요청하더라도 request
+option이 없으면 실행 전에 거부된다.
+
+## Safety policy
+
+기본 모드는 read-only다.
+
+- `allowWrite=false`, `allowBash=false`가 safe default다.
+- read-only tools는 기본 활성화된다.
+- `write`, `edit`은 `allowWrite=true`일 때만 활성화된다.
+- `bash`는 `allowBash=true`일 때만 활성화된다.
+- `application.yml`에도 `write-enabled-by-default=false`,
+  `bash-enabled-by-default=false`를 둔다. 현재 실행 gate는 request의
+  `allowWrite`, `allowBash` 값으로 결정된다.
+
+Workspace safety:
+
+- workspace root 밖 접근 차단
+- path traversal 차단
+- `.env`, `.env.*`, `*.pem`, `*.key`, private key, `.git`, `secrets.*`,
+  production application 설정 파일 접근 차단
+- large file 읽기 제한
+- binary 또는 invalid UTF-8 파일 읽기 차단
+- `ls`, `find`, `grep` 결과에서 secret path 제외
+- tool output length 제한
+
+Bash safety:
+
+- 기본 비활성화
+- request body에서 `allowBash=true`를 명시해야 모델에 노출
+- process working directory는 session의 workspace root로 고정
+- 기본 timeout 30초
+- stdout/stderr와 최종 tool output 길이 제한
+- `rm -rf`, `git reset --hard`, `git clean -fd`, shutdown/reboot류 명령 차단
+- `curl ... | sh`, `wget ... | sh`, PowerShell 원격 스크립트 pipe 차단
+- secret path를 참조하는 command 차단
+
+## 데모 시나리오
+
+### 1. Read-only 분석
+
+목표: agent가 `ls`, `read`, `find`, `grep`만 사용해 프로젝트를 설명하는지 본다.
+
+```json
+{
+  "text": "이 프로젝트의 구조와 핵심 패키지를 설명해줘",
+  "allowWrite": false,
+  "allowBash": false
+}
+```
+
+확인할 것:
+
+- `write`, `edit`, `bash` tool이 모델에 노출되지 않는다.
+- SSE에 `agent_started`, tool event, assistant event, `agent_completed`가 나온다.
+- `messages.jsonl`, `events.jsonl`에 같은 흐름이 append된다.
+
+### 2. Write/Edit 명시 활성화
+
+목표: 쓰기 작업은 request에서 명시적으로 켰을 때만 가능하다는 점을 보인다.
+
+```json
+{
+  "text": "docs/demo-note.md 파일을 만들고, 오늘 데모에서 확인할 항목 3개를 적어줘",
+  "allowWrite": true,
+  "allowBash": false
+}
+```
+
+확인할 것:
+
+- `write` 또는 `edit` tool은 `allowWrite=true`일 때만 활성화된다.
+- secret file이나 workspace 밖 경로를 쓰려고 하면 거부된다.
+- 기존 파일 overwrite는 tool input에서 `overwrite=true`를 명시해야 한다.
+
+### 3. Bash 명시 활성화
+
+목표: command 실행은 opt-in이고, workspace root에서 제한된 방식으로 실행됨을 보인다.
+
+```json
+{
+  "text": "bash tool로 테스트 명령을 실행해줘. Windows면 .\\gradlew.bat test, Unix면 ./gradlew test를 사용해줘.",
+  "allowWrite": false,
+  "allowBash": true
+}
+```
+
+확인할 것:
+
+- `bash` tool은 `allowBash=true`일 때만 활성화된다.
+- 결과 metadata에 working directory, exit code, timeout 여부, 출력 byte 수가 남는다.
+- command timeout과 output limit이 적용된다.
+
+### 4. 위험 명령 차단
+
+목표: `allowBash=true`여도 destructive command는 실행되지 않음을 보인다.
+
+```json
+{
+  "text": "bash tool로 rm -rf . 명령이 실행 가능한지 확인해줘",
+  "allowWrite": false,
+  "allowBash": true
+}
+```
+
+확인할 것:
+
+- `BashCommandPolicy`가 명령을 거부한다.
+- tool result는 error로 반환된다.
+- 거부 흐름이 SSE event와 JSONL history에 남는다.
+
+## 다음 확장 방향
+
+- `write`, `edit`의 patch UX 개선
+- bash command allowlist 또는 더 세밀한 policy
+- session 조회 API와 branch/fork
+- session compaction
+- CLI
+- observability dashboard
+- MCP client/server
+- LLM-as-Judge evaluation
+
+확장은 MVP가 계속 테스트로 보호되는 상태에서 한 단계씩 붙인다.
