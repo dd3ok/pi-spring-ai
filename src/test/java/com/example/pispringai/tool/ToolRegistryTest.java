@@ -93,6 +93,27 @@ class ToolRegistryTest {
                 });
     }
 
+    @Test
+    void springRegistryIncludesWriteToolsWhenAllowWriteIsTrue() {
+        contextRunner
+                .withPropertyValues("agent.workspace.root=.")
+                .run(context -> {
+                    ToolRegistry registry = context.getBean(ToolRegistry.class);
+                    AgentRunOptions allowWrite = new AgentRunOptions(
+                            true,
+                            false,
+                            6,
+                            12,
+                            Duration.ofSeconds(120));
+
+                    assertThat(registry.enabledTools(allowWrite))
+                            .extracting(tool -> tool.spec().name())
+                            .containsExactlyInAnyOrder("ls", "read", "find", "grep", "write", "edit");
+                    assertThat(registry.get("write").spec().safetyLevel()).isEqualTo(ToolSafetyLevel.WRITE);
+                    assertThat(registry.get("edit").spec().safetyLevel()).isEqualTo(ToolSafetyLevel.WRITE);
+                });
+    }
+
     private record StubTool(String name, ToolSafetyLevel safetyLevel, boolean enabledByDefault) implements AgentTool {
 
         private StubTool(String name) {

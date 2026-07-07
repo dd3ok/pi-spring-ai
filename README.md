@@ -49,7 +49,7 @@ and replayable sessions for Java/Spring developers.
 
 ## Current Status
 
-현재는 `M8 AgentRuntime + SSE` 단계다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
+현재는 `M9 Write/Edit tools` 단계까지 구현했다. Spring Boot 애플리케이션 골격 위에 Spring AI `ChatClient`를 사용하는 최소 `/api/chat` endpoint가 있고, Gemini를 기본 chat provider로 둔 상태에서 OpenAI로도 전환할 수 있다.
 
 M2에서는 아직 LLM tool calling, session store, AgentRuntime을 붙이지 않고 AgentRuntime 구현 전에 필요한 순수 도메인 타입만 추가했다.
 
@@ -114,6 +114,12 @@ M8에서는 세션 기반 prompt 처리와 SSE event stream을 추가했다.
 - `ModelClient`, `SpringAiModelClient`: runtime이 Spring AI `ChatClient`에 직접 묶이지 않도록 둔 얇은 model boundary
 - `AgentController`: `POST /api/sessions`, `POST /api/sessions/{sessionId}/messages/stream`
 - stream endpoint는 `agent_started`, `user_message_appended`, `assistant_delta`, `assistant_completed`, `agent_completed`와 tool event를 SSE로 보낸다.
+
+M9에서는 명시적으로 `allowWrite=true`일 때만 실행되는 write/edit built-in tools를 추가했다.
+
+- `WriteTool`: workspace 내부 UTF-8 텍스트 파일 생성과 명시적 overwrite 지원. secret, traversal, missing parent를 차단
+- `EditTool`: workspace 내부 UTF-8 텍스트 파일에서 `oldText`가 정확히 한 번 매칭될 때만 치환. secret, traversal, large/binary file을 차단
+- `ToolRegistry`: `allowWrite=true` 옵션에서 `write`, `edit` 도구를 활성화
 
 ## Run
 
@@ -194,4 +200,4 @@ data:{"type":"agent_started",...}
 
 메시지와 이벤트는 `agent.session.root` 아래 JSONL 파일로 append된다. 테스트는 fake runtime/model을 사용하므로 실제 외부 LLM API를 호출하지 않는다.
 
-다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M9` 프롬프트를 기준으로 시작한다.
+다음 구현 작업은 `docs/04_CODEX_TASK_PROMPTS.md`의 `Task M10` 프롬프트를 기준으로 시작한다.
