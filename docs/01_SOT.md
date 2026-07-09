@@ -199,6 +199,36 @@ MCP는 중요한 확장 지점이지만 MVP에서는 제외한다. Tool abstract
 
 프로젝트 파일을 읽고 검색하는 것이 먼저다. Vector indexing은 후속 확장이다.
 
+### 5.6 MVP 이후 본편과 옵션 구분
+
+MVP는 M11 README/demo polish에서 닫는다. M12 이후는 MVP를 다시 키우는 단계가
+아니라, 이미 만든 runtime/tool/session 구조를 더 안전하고 설명 가능하게 만드는
+post-MVP 본편이다.
+
+M12~M15 본편:
+
+| 단계 | 주제 | 기준 |
+|---|---|---|
+| M12 | Tool safety hardening | path, secret, output limit, bash deny 사례를 테스트와 문서로 고정 |
+| M13 | Session history/replay polish | SSE event와 JSONL session history를 조회/재현 가능한 흐름으로 정리 |
+| M14 | MCP client integration | 외부 MCP tool을 기존 tool registry/policy 경계 안으로 opt-in 연결 |
+| M15 | MCP server exposure | built-in tool을 MCP server로 노출하되 read-only와 opt-in 안전 기본값 유지 |
+
+옵션 또는 시즌 2로 미룬다.
+
+- RAG/Vector DB
+- Tool Search Advisor
+- CLI/TUI/dashboard
+- LLM-as-Judge evaluation
+- session branch/fork
+- compaction
+- multi-agent
+- plugin/package system
+
+MCP는 post-MVP 본편에 포함할 수 있지만, `ToolRegistry`, `ToolExecutionService`,
+`ToolPolicy`, SSE, JSONL session 구조를 대체하지 않는다. RAG/Vector DB는 Spring AI가
+지원하더라도 이 프로젝트의 본편 주제인 coding agent runtime과 분리한다.
+
 ---
 
 ## 6. 성공 기준

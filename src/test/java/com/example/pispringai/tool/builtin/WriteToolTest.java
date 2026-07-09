@@ -107,6 +107,30 @@ class WriteToolTest {
     }
 
     @Test
+    void rejectsNestedSecretFilePaths() throws Exception {
+        Path config = Files.createDirectories(workspace.resolve("config"));
+        Path keys = Files.createDirectories(workspace.resolve("keys"));
+        Path resources = Files.createDirectories(workspace.resolve("src/main/resources"));
+
+        ToolResult envLocal = newTool().execute(args("config/.env.local", "SECRET=yes", false));
+        ToolResult privateKey = newTool().execute(args("keys/id_rsa", "secret", false));
+        ToolResult prodConfig = newTool().execute(args(
+                "src/main/resources/application-prod.yml",
+                "secret: yes",
+                false));
+
+        assertThat(envLocal.error()).isTrue();
+        assertThat(privateKey.error()).isTrue();
+        assertThat(prodConfig.error()).isTrue();
+        assertThat(envLocal.text()).contains("denied");
+        assertThat(privateKey.text()).contains("denied");
+        assertThat(prodConfig.text()).contains("denied");
+        assertThat(Files.exists(config.resolve(".env.local"))).isFalse();
+        assertThat(Files.exists(keys.resolve("id_rsa"))).isFalse();
+        assertThat(Files.exists(resources.resolve("application-prod.yml"))).isFalse();
+    }
+
+    @Test
     void failsWhenParentDirectoryIsMissing() {
         ToolResult result = newTool().execute(args("missing/notes.txt", "hello", false));
 

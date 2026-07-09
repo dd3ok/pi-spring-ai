@@ -945,17 +945,36 @@ public record AgentErrorEvent(
 
 ## 15. 후속 확장 설계
 
-MVP 이후 순서:
+MVP는 M11에서 닫는다. 이후 본편은 새로운 platform을 만드는 방향이 아니라, 기존
+`AgentRuntime`, `ToolRegistry`, `ToolExecutionService`, `ToolPolicy`, SSE, JSONL
+session 구조를 유지한 채 안전성, 재현성, MCP 연결성을 늘리는 방향으로 둔다.
 
-1. `write`, `edit` 안정화
-2. `bash` command policy 강화
-3. session branch/fork
-4. compaction
-5. Tool Search Advisor
-6. MCP client
-7. MCP server
-8. CLI
-9. Observability dashboard
-10. LLM-as-Judge evaluation
+### 15.1 M12~M15 본편
+
+| 단계 | 주제 | 포함 | 제외 |
+|---|---|---|---|
+| M12 | Tool safety hardening | write/edit/bash 정책 보강, path/secret/output/timeout deny test, README safety 보완 | 새 tool, MCP, runtime loop 변경 |
+| M13 | Session history/replay polish | session 조회/replay 흐름, SSE와 JSONL 설명, history smoke test | DB, branch/fork, compaction |
+| M14 | MCP client integration | Spring AI MCP client를 opt-in으로 연결, tool filtering/name prefix, fake/local test | MCP가 core tool system을 대체하는 구조 |
+| M15 | MCP server exposure | built-in tools를 MCP server로 노출, read-only 기본값, write/bash opt-in | plugin marketplace, remote registry, multi-agent |
+
+### 15.2 MCP 설계 guardrail
+
+- MCP는 adapter다. 기존 `ToolRegistry`와 `ToolPolicy`를 대체하지 않는다.
+- MCP client/server는 기본 비활성 또는 명시 설정 기반으로 둔다.
+- MCP tool 실행도 기존 policy를 통과하거나, 동등한 안전 경계를 문서화해야 한다.
+- 기본 테스트는 외부 MCP server, 외부 LLM API, API key 없이 통과해야 한다.
+- MCP 보안 모델은 프로젝트의 workspace safety와 command policy를 약화시키면 안 된다.
+
+### 15.3 시즌 2 또는 옵션
+
+다음 항목은 본편에서 제외한다.
+
+- RAG/Vector DB: coding agent runtime이 아니라 knowledge retrieval 주제이므로 별도 시즌에서 다룬다.
+- Tool Search Advisor: MCP와 registry 구조가 안정화된 뒤 검토한다.
+- CLI/TUI/dashboard: runtime을 우회하지 않는 얇은 operator surface로만 검토한다.
+- LLM-as-Judge evaluation: API key가 필요한 평가는 opt-in profile/demo로만 둔다.
+- session branch/fork, compaction: M13의 replay/history가 충분히 안정화된 뒤 검토한다.
+- multi-agent, plugin/package system: 이 프로젝트의 작은 Spring harness 범위를 넘는다.
 
 확장은 반드시 MVP가 동작하고 테스트가 생긴 뒤 진행한다.

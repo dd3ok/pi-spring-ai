@@ -17,7 +17,7 @@
 - AGENTS.md
 
 중요 원칙:
-- MVP 범위를 넘지 마.
+- 요청된 마일스톤 범위를 넘지 마. M0~M11은 MVP이고, M12 이후는 post-MVP로 명시된 범위만 수행해.
 - 새 production dependency는 반드시 이유를 먼저 설명하고, 가능하면 추가하지 마.
 - 외부 LLM API를 실제 테스트에서 호출하지 마.
 - 보안 기본값은 fail-closed로 둬.
@@ -480,6 +480,143 @@ Task M11만 구현해줘.
 - README만 보고 프로젝트를 실행할 수 있음
 - 블로그 글로 이어질 수 있게 쉬운 설명 포함
 - ./gradlew test 통과
+```
+
+---
+
+## Task M12 — Tool safety hardening
+
+```text
+Task M12만 수행해줘.
+
+목표:
+이미 구현된 read-only/write/edit/bash tool의 safety policy를 테스트와 문서로 더 단단히 고정해줘.
+
+범위:
+- path traversal, workspace 밖 접근, secret path deny 사례 보강
+- write/edit overwrite, exact oldText match 실패 사례 보강
+- bash destructive command, timeout, output limit 사례 보강
+- policy denied가 SSE event와 JSONL history에 남는지 확인
+- README safety 설명 보완
+
+하지 말 것:
+- 새 tool 추가하지 마
+- AgentRuntime loop 변경하지 마
+- Spring AI adapter 구조 변경하지 마
+- MCP 붙이지 마
+- 새 production dependency 추가하지 마
+
+완료 조건:
+- tool/policy deny 사례가 테스트로 고정됨
+- API key 없이 ./gradlew test 통과
+- README만 보고 safety model을 설명할 수 있음
+```
+
+---
+
+## Task M13 — Session history/replay polish
+
+```text
+Task M13만 수행해줘.
+
+목표:
+SSE event와 JSONL session history를 조회, 설명, 재현 가능한 흐름으로 정리해줘.
+
+범위:
+- session history 확인 흐름 정리
+- messages.jsonl/events.jsonl 예시 보강
+- SSE event와 JSONL record의 관계 문서화
+- replay/debug demo 시나리오 추가
+- 필요한 경우 좁은 smoke test 추가
+
+하지 말 것:
+- DB 붙이지 마
+- branch/fork 구현하지 마
+- compaction 구현하지 마
+- Spring AI ChatMemory를 session history 대체재로 쓰지 마
+- 새 production dependency 추가하지 마
+
+완료 조건:
+- session 생성부터 event 기록까지 README/docs만 보고 따라갈 수 있음
+- JSONL history가 debugging/replay 자료라는 점이 명확함
+- API key 없이 ./gradlew test 통과
+```
+
+---
+
+## Task M14 — MCP client integration
+
+```text
+Task M14만 수행해줘.
+
+목표:
+Spring AI MCP client를 post-MVP adapter로 붙여 외부 MCP tool을 기존 tool/policy 경계 안에서 opt-in으로 사용할 수 있게 해줘.
+
+범위:
+- Spring AI MCP client starter 필요 여부와 dependency 이유 문서화
+- MCP client 기본 비활성 또는 명시 설정 기반 활성화
+- tool filtering/name prefix 정책 정리
+- MCP tool 실행이 ToolPolicy를 우회하지 않도록 adapter 설계
+- fake/local MCP server 기반 테스트
+- README/docs에 MCP client demo 정리
+
+하지 말 것:
+- MCP를 core tool system으로 바꾸지 마
+- dynamic plugin marketplace 만들지 마
+- 외부 네트워크나 API key가 필요한 테스트 만들지 마
+- RAG/Vector DB를 함께 붙이지 마
+
+완료 조건:
+- MCP disabled 상태에서 기존 built-in tools가 그대로 동작함
+- MCP enabled demo가 기존 event/session 흐름에 기록됨
+- API key 없이 ./gradlew test 통과
+```
+
+---
+
+## Task M15 — MCP server exposure
+
+```text
+Task M15만 수행해줘.
+
+목표:
+현재 built-in tools를 Spring AI MCP server로 노출해 이 프로젝트가 MCP ecosystem의 server 역할도 할 수 있음을 보여줘.
+
+범위:
+- Spring AI MCP server starter 필요 여부와 dependency 이유 문서화
+- read-only tools 우선 노출
+- write/edit/bash는 opt-in 정책 유지
+- MCP server 호출도 workspace safety와 command policy를 통과하게 구성
+- README에 MCP client/server demo 정리
+
+하지 말 것:
+- remote registry 만들지 마
+- plugin system 만들지 마
+- multi-agent 만들지 마
+- MCP server가 기존 REST/SSE API를 대체하게 하지 마
+- bash를 기본 노출하지 마
+
+완료 조건:
+- read-only MCP server demo 가능
+- write/edit/bash는 명시 opt-in 없이는 노출 또는 실행되지 않음
+- API key 없이 ./gradlew test 통과
+```
+
+---
+
+## 시즌 2 또는 옵션으로 남길 항목
+
+아래 항목은 본편 프롬프트로 바로 실행하지 않는다. 별도 SOT/설계 업데이트 후 진행한다.
+
+```text
+- RAG/Vector DB
+- Tool Search Advisor
+- CLI/TUI/dashboard
+- LLM-as-Judge evaluation
+- session branch/fork
+- compaction
+- multi-agent
+- plugin/package system
 ```
 
 ---

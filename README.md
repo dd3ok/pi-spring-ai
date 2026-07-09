@@ -240,6 +240,15 @@ Bash safety:
 - `curl ... | sh`, `wget ... | sh`, PowerShell 원격 스크립트 pipe 차단
 - secret path를 참조하는 command 차단
 
+M12에서 회귀 테스트로 고정한 safety 사례:
+
+- nested secret path 차단: `config/.env.local`, `keys/id_rsa`,
+  `src/main/resources/application-prod.yml`
+- PowerShell recursive delete variant 차단: `Remove-Item -Recurse -Force .`,
+  `Remove-Item -r -Force .`, `ri -r .`, `rd -Recurse .`, `del -r .`,
+  `erase -r .`, `rm -r .`
+- policy denied reason이 `tool_call_denied` SSE event와 JSONL session history에 남는지 확인
+
 ## 데모 시나리오
 
 ### 1. Read-only 분석
@@ -316,13 +325,24 @@ Bash safety:
 
 ## 다음 확장 방향
 
-- `write`, `edit`의 patch UX 개선
-- bash command allowlist 또는 더 세밀한 policy
-- session 조회 API와 branch/fork
-- session compaction
-- CLI
-- observability dashboard
-- MCP client/server
-- LLM-as-Judge evaluation
+M0부터 M12까지는 작은 Pi-inspired coding agent harness의 MVP와 safety hardening 단계다.
+이후 본편은 기능을 넓히기보다, 이미 만든 runtime/tool/session 구조를 더 설명 가능하게
+단단히 만드는 순서로 진행한다.
+
+| Milestone | 상태 | 방향 | 핵심 기준 |
+|---|---|---|---|
+| M12 | 완료 | Tool safety hardening | path/secret/bash deny 사례를 더 촘촘히 테스트하고, 기존 output limit 회귀 테스트를 유지 |
+| M13 | 다음 | Session history/replay polish | SSE와 JSONL session history를 조회, 설명, 재현 가능한 흐름으로 정리 |
+| M14 | 다음 | MCP client integration | 외부 MCP server의 tool을 기존 `ToolRegistry`/`ToolPolicy` 경계 안으로 opt-in 연결 |
+| M15 | 다음 | MCP server exposure | 현재 built-in tools를 Spring AI MCP server로 노출하되 read-only와 opt-in 원칙 유지 |
+
+시즌 2 또는 옵션으로 미룰 항목:
+
+- RAG/Vector DB: 코딩 agent runtime이 아니라 knowledge retrieval 주제이므로 별도 흐름으로 분리
+- Tool Search Advisor: MCP와 tool registry가 안정화된 뒤 검토
+- CLI, TUI, dashboard: runtime을 우회하지 않는 얇은 operator surface로만 검토
+- LLM-as-Judge evaluation: 기본 테스트가 API key 없이 통과해야 하므로 opt-in profile/demo로만 검토
+- session branch/fork, compaction: JSONL replay가 충분히 설명 가능해진 뒤 확장
+- multi-agent, plugin/package system: MVP와 post-MVP 본편 범위 밖
 
 확장은 MVP가 계속 테스트로 보호되는 상태에서 한 단계씩 붙인다.
