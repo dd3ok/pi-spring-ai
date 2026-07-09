@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,6 +38,18 @@ public class AgentController {
         return Mono.fromCallable(() -> sessionStore.create(workspaceRoot(request.workspaceRoot())))
                 .subscribeOn(Schedulers.boundedElastic())
                 .map(session -> new CreateSessionResponse(session.id(), session.workspaceRoot().toString()));
+    }
+
+    @GetMapping("/{sessionId}")
+    public Mono<SessionHistoryResponse> getSession(@PathVariable String sessionId) {
+        return Mono.fromCallable(() -> {
+                    AgentSession session = findSession(sessionId);
+                    return SessionHistoryResponse.from(
+                            session,
+                            sessionStore.loadMessages(session.id()),
+                            sessionStore.loadEvents(session.id()));
+                })
+                .subscribeOn(Schedulers.boundedElastic());
     }
 
     @PostMapping(

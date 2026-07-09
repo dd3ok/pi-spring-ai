@@ -5,7 +5,13 @@ import com.example.pispringai.agent.AgentRuntime;
 import com.example.pispringai.agent.event.AgentCompletedEvent;
 import com.example.pispringai.agent.event.AgentEvent;
 import com.example.pispringai.agent.event.AgentStartedEvent;
+import com.example.pispringai.agent.event.ToolCallFinishedEvent;
+import com.example.pispringai.agent.event.ToolCallStartedEvent;
 import com.example.pispringai.agent.message.AgentMessage;
+import com.example.pispringai.agent.message.AssistantMessage;
+import com.example.pispringai.agent.message.AssistantStopReason;
+import com.example.pispringai.agent.message.ToolResultMessage;
+import com.example.pispringai.agent.message.UserMessage;
 import com.example.pispringai.session.AgentSession;
 import com.example.pispringai.session.SessionStore;
 import java.nio.file.Path;
@@ -109,6 +115,41 @@ class AgentControllerTest {
                 .expectStatus().isNotFound();
     }
 
+    @Test
+    void getSessionReturnsSessionMessagesAndEventsForReplay() {
+        webTestClient.get()
+                .uri("/api/sessions/s_existing")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.session.id").isEqualTo("s_existing")
+                .jsonPath("$.session.workspaceRoot").isEqualTo(Path.of("build/sample-workspace").toAbsolutePath().normalize().toString())
+                .jsonPath("$.messages[0].kind").isEqualTo("user")
+                .jsonPath("$.messages[0].text").isEqualTo("hello")
+                .jsonPath("$.messages[1].kind").isEqualTo("tool_result")
+                .jsonPath("$.messages[1].toolName").isEqualTo("read")
+                .jsonPath("$.messages[1].resultText").isEqualTo("README.md")
+                .jsonPath("$.messages[1].error").isEqualTo(false)
+                .jsonPath("$.messages[2].kind").isEqualTo("assistant")
+                .jsonPath("$.messages[2].text").isEqualTo("done")
+                .jsonPath("$.events[0].type").isEqualTo("agent_started")
+                .jsonPath("$.events[1].type").isEqualTo("tool_call_started")
+                .jsonPath("$.events[1].callId").isEqualTo("tc_1")
+                .jsonPath("$.events[1].tool").isEqualTo("read")
+                .jsonPath("$.events[2].type").isEqualTo("tool_call_finished")
+                .jsonPath("$.events[2].callId").isEqualTo("tc_1")
+                .jsonPath("$.events[2].error").isEqualTo(false)
+                .jsonPath("$.events[3].type").isEqualTo("agent_completed");
+    }
+
+    @Test
+    void getSessionReturnsNotFoundForMissingSession() {
+        webTestClient.get()
+                .uri("/api/sessions/s_missing")
+                .exchange()
+                .expectStatus().isNotFound();
+    }
+
     @TestConfiguration
     static class FakeAgentConfig {
 
@@ -178,11 +219,43 @@ class AgentControllerTest {
 
         @Override
         public List<AgentMessage> loadMessages(String sessionId) {
+            if ("s_existing".equals(sessionId)) {
+                return List.of(
+                        new UserMessage(
+                                "m_1",
+                                sessionId,
+                                null,
+                                Instant.parse("2026-06-29T00:00:00Z"),
+                                "hello"),
+                        new ToolResultMessage(
+                                "m_2",
+                                sessionId,
+                                "m_1",
+                                Instant.parse("2026-06-29T00:00:01Z"),
+                                "tc_1",
+                                "read",
+                                "README.md",
+                                false),
+                        new AssistantMessage(
+                                "m_3",
+                                sessionId,
+                                "m_2",
+                                Instant.parse("2026-06-29T00:00:02Z"),
+                                "done",
+                                AssistantStopReason.STOP));
+            }
             return List.of();
         }
 
         @Override
         public List<AgentEvent> loadEvents(String sessionId) {
+            if ("s_existing".equals(sessionId)) {
+                return List.of(
+                        new AgentStartedEvent("e_1", sessionId, Instant.parse("2026-06-29T00:00:00Z")),
+                        new ToolCallStartedEvent("e_2", sessionId, Instant.parse("2026-06-29T00:00:01Z"), "tc_1", "read"),
+                        new ToolCallFinishedEvent("e_3", sessionId, Instant.parse("2026-06-29T00:00:02Z"), "tc_1", "read", false),
+                        new AgentCompletedEvent("e_4", sessionId, Instant.parse("2026-06-29T00:00:03Z")));
+            }
             return List.of();
         }
     }

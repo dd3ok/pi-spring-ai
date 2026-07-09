@@ -9,7 +9,7 @@ history로 남기는 구조를 Java/Spring 개발자가 읽고 설명할 수 있
 
 ## 현재 상태
 
-M0부터 M10까지 구현되어 있다.
+M0부터 M13까지 구현되어 있다.
 
 - Java 21 toolchain with `--release 21`
 - Spring Boot 4.1.0
@@ -30,6 +30,7 @@ M0부터 M10까지 구현되어 있다.
 ```text
 Client
   -> POST /api/sessions
+  -> GET /api/sessions/{sessionId}
   -> POST /api/sessions/{sessionId}/messages/stream
   -> AgentRuntime
   -> ModelClient
@@ -175,8 +176,40 @@ id:e_...
 data:{"type":"agent_started",...}
 ```
 
-현재 외부 session 조회 API는 만들지 않았다. history는 session root 아래 JSONL
-파일로 확인한다.
+### Session history 조회
+
+M13부터는 같은 session의 metadata, messages, events를 API로도 조회할 수 있다.
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://localhost:8080/api/sessions/$($session.sessionId)"
+```
+
+응답은 replay/debug에 필요한 세 가지를 함께 돌려준다.
+
+```json
+{
+  "session": {
+    "id": "s_...",
+    "workspaceRoot": "C:\\path\\to\\project",
+    "createdAt": "...",
+    "updatedAt": "...",
+    "title": null
+  },
+  "messages": [
+    {"kind": "user", "text": "..."},
+    {"kind": "tool_result", "toolName": "ls", "error": false}
+  ],
+  "events": [
+    {"type": "agent_started"},
+    {"type": "tool_call_started"},
+    {"type": "agent_completed"}
+  ]
+}
+```
+
+같은 history는 session root 아래 JSONL 파일로도 남는다.
 
 ```text
 .pi-spring-ai/sessions/{sessionId}/
@@ -323,16 +356,36 @@ M12에서 회귀 테스트로 고정한 safety 사례:
 - tool result는 error로 반환된다.
 - 거부 흐름이 SSE event와 JSONL history에 남는다.
 
+### 5. Session history / replay 확인
+
+목표: 실시간 SSE와 나중에 조회하는 JSONL history가 같은 실행 흐름을 설명하는지 본다.
+
+```powershell
+Invoke-RestMethod `
+  -Method Get `
+  -Uri "http://localhost:8080/api/sessions/$($session.sessionId)"
+```
+
+확인할 것:
+
+- `messages`에는 user, tool result, assistant 기록이 실행 순서대로 남는다.
+- `events`에는 SSE로 흘렀던 `agent_started`, tool event, assistant event,
+  `agent_completed`가 남는다.
+- `.pi-spring-ai/sessions/{sessionId}/messages.jsonl`,
+  `.pi-spring-ai/sessions/{sessionId}/events.jsonl`을 직접 열어도 같은 흐름을 확인할 수 있다.
+- 이 조회 API는 replay/debug용이며 branch/fork, compaction, DB 저장을 구현하지 않는다.
+
 ## 다음 확장 방향
 
-M0부터 M12까지는 작은 Pi-inspired coding agent harness의 MVP와 safety hardening 단계다.
+M0부터 M13까지는 작은 Pi-inspired coding agent harness의 MVP, safety hardening,
+session history polish 단계다.
 이후 본편은 기능을 넓히기보다, 이미 만든 runtime/tool/session 구조를 더 설명 가능하게
 단단히 만드는 순서로 진행한다.
 
 | Milestone | 상태 | 방향 | 핵심 기준 |
 |---|---|---|---|
 | M12 | 완료 | Tool safety hardening | path/secret/bash deny 사례를 더 촘촘히 테스트하고, 기존 output limit 회귀 테스트를 유지 |
-| M13 | 다음 | Session history/replay polish | SSE와 JSONL session history를 조회, 설명, 재현 가능한 흐름으로 정리 |
+| M13 | 완료 | Session history/replay polish | SSE와 JSONL session history를 조회, 설명, 재현 가능한 흐름으로 정리 |
 | M14 | 다음 | MCP client integration | 외부 MCP server의 tool을 기존 `ToolRegistry`/`ToolPolicy` 경계 안으로 opt-in 연결 |
 | M15 | 다음 | MCP server exposure | 현재 built-in tools를 Spring AI MCP server로 노출하되 read-only와 opt-in 원칙 유지 |
 
