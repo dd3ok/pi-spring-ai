@@ -27,6 +27,10 @@
 | 10 | M9 Write/Edit tools | 쓰기 도구를 기본 비활성화로 붙이는 방식 | allowWrite 테스트 |
 | 11 | M10 Bash tool | 명령 실행을 가장 보수적으로 허용하는 방식 | destructive command 차단 테스트 |
 | 12 | M11 README/demo polish | 포트폴리오로 설명 가능한 최종 데모 정리 | README만 보고 실행 가능 |
+| 13 | M12 Tool safety hardening | agent tool은 기능보다 policy가 먼저라는 점 | deny/output/timeout regression test |
+| 14 | M13 Session history/replay polish | SSE는 실시간 관찰, JSONL은 replay 가능한 기록이라는 점 | session history/replay demo |
+| 15 | M14 MCP client integration | MCP를 runtime 재작성 없이 adapter로 붙이는 방식 | MCP disabled/enabled test |
+| 16 | M15 MCP server exposure | Spring service와 built-in tool을 MCP server로 노출하는 방식 | read-only MCP server demo |
 
 ## 각 글의 고정 구성
 
@@ -40,6 +44,26 @@
 ## 커밋/태그 메모
 
 각 글을 발행할 때 해당 커밋 해시를 글 하단에 남긴다. 필요하면 나중에 `blog/m0`, `blog/m1` 같은 태그를 붙인다.
+
+## M11 이후 방향
+
+M11에서 MVP를 포트폴리오 형태로 닫고, M12~M15는 post-MVP 본편으로 다룬다.
+
+- M12는 새 기능보다 tool safety regression을 강화하는 글이다.
+- M13은 Spring AI ChatMemory가 아니라 JSONL session history와 SSE event가 왜 필요한지 설명하는 글이다.
+- M14는 MCP client를 기존 `ToolRegistry`/`ToolPolicy` 경계 안에 붙이는 글이다.
+- M15는 현재 built-in tools를 MCP server로 노출하되 read-only와 opt-in 원칙을 유지하는 글이다.
+
+다음 항목은 시즌 2 또는 옵션으로 미룬다.
+
+- RAG/Vector DB
+- Tool Search Advisor
+- CLI/TUI/dashboard
+- LLM-as-Judge evaluation
+- session branch/fork
+- compaction
+- multi-agent
+- plugin/package system
 
 ## 구현 메모
 

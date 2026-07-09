@@ -2,6 +2,7 @@ package com.example.pispringai.agent;
 
 import com.example.pispringai.agent.event.AgentEvent;
 import com.example.pispringai.agent.event.AgentEventType;
+import com.example.pispringai.agent.event.ToolCallDeniedEvent;
 import com.example.pispringai.agent.message.AgentMessage;
 import com.example.pispringai.agent.message.AssistantMessage;
 import com.example.pispringai.agent.message.AssistantStopReason;
@@ -184,6 +185,15 @@ class DefaultAgentRuntimeTest {
         assertThat(toolResult.toolName()).isEqualTo("write");
         assertThat(toolResult.resultText()).isEqualTo("Denied: allowWrite=false");
         assertThat(toolResult.error()).isTrue();
+
+        ToolCallDeniedEvent deniedEvent = store.loadEvents(session.id()).stream()
+                .filter(ToolCallDeniedEvent.class::isInstance)
+                .map(ToolCallDeniedEvent.class::cast)
+                .findFirst()
+                .orElseThrow();
+        assertThat(deniedEvent.callId()).isEqualTo("tc_write");
+        assertThat(deniedEvent.tool()).isEqualTo("write");
+        assertThat(deniedEvent.reason()).isEqualTo("Denied: allowWrite=false");
     }
 
     @Test

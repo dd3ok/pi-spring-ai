@@ -29,6 +29,10 @@ public class BashCommandPolicy {
     private static final Pattern SHUTDOWN_OR_REBOOT =
             Pattern.compile("(?:^|[;&|]\\s*)(?:(?:sudo|doas|env)\\s+)*"
                     + "(?:shutdown(?:\\.exe)?|reboot|poweroff|halt|init\\s+[06])\\b");
+    private static final Pattern POWERSHELL_REMOVE_ITEM_RECURSIVE =
+            Pattern.compile("\\bremove-item\\b(?=.*\\s-(?:recurse|r)(?:\\b|[:=]))"
+                    + "|\\b(?:powershell(?:\\.exe)?|pwsh(?:\\.exe)?)\\b.*"
+                    + "\\b(?:ri|del|erase|rd|rmdir|rm)\\b(?=.*\\s-(?:recurse|r)(?:\\b|[:=]))");
     private static final Pattern WINDOWS_DELETE_RECURSIVE =
             Pattern.compile("\\b(?:del|erase|rd|rmdir)\\b.*\\s/s\\b");
     private static final Pattern COMMAND_TOKEN_SPLIT = Pattern.compile("[\\s|;&<>]+");
@@ -67,7 +71,7 @@ public class BashCommandPolicy {
                 || REMOTE_SCRIPT_PIPE.matcher(normalized).find()
                 || REMOTE_POWERSHELL_PIPE.matcher(normalized).find()
                 || SHUTDOWN_OR_REBOOT.matcher(normalized).find()
-                || normalized.contains("remove-item") && normalized.contains("-recurse")
+                || POWERSHELL_REMOVE_ITEM_RECURSIVE.matcher(normalized).find()
                 || WINDOWS_DELETE_RECURSIVE.matcher(normalized).find();
     }
 

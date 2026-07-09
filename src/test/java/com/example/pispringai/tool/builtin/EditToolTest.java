@@ -114,6 +114,28 @@ class EditToolTest {
     }
 
     @Test
+    void rejectsNestedSecretFilePaths() throws Exception {
+        Path config = Files.createDirectories(workspace.resolve("config"));
+        Path keys = Files.createDirectories(workspace.resolve("keys"));
+        Path resources = Files.createDirectories(workspace.resolve("src/main/resources"));
+        Files.writeString(config.resolve(".env.local"), "old");
+        Files.writeString(keys.resolve("id_rsa"), "old");
+        Files.writeString(resources.resolve("application-prod.yml"), "old");
+        EditTool tool = newTool(100);
+
+        ToolResult envLocal = tool.execute(args("config/.env.local", "old", "new"));
+        ToolResult privateKey = tool.execute(args("keys/id_rsa", "old", "new"));
+        ToolResult prodConfig = tool.execute(args("src/main/resources/application-prod.yml", "old", "new"));
+
+        assertThat(envLocal.error()).isTrue();
+        assertThat(privateKey.error()).isTrue();
+        assertThat(prodConfig.error()).isTrue();
+        assertThat(Files.readString(config.resolve(".env.local"))).isEqualTo("old");
+        assertThat(Files.readString(keys.resolve("id_rsa"))).isEqualTo("old");
+        assertThat(Files.readString(resources.resolve("application-prod.yml"))).isEqualTo("old");
+    }
+
+    @Test
     void failsForLargeOrBinaryFiles() throws Exception {
         Files.writeString(workspace.resolve("large.txt"), "abcdef");
         Files.write(workspace.resolve("binary.bin"), new byte[] {'a', 0, 'b'});
