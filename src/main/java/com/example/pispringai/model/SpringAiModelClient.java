@@ -35,7 +35,7 @@ public class SpringAiModelClient implements ModelClient {
                 ? request.user(command.userText())
                 : request.messages(messages);
         return request
-                .tools(toolCallbackFactory.callbacksFor(command.options(), command.workspaceRoot(), events))
+                .tools(toolCallbackFactory.providerFor(command.options(), command.workspaceRoot(), events))
                 .stream()
                 .content();
     }

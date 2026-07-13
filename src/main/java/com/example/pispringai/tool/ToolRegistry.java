@@ -1,6 +1,7 @@
 package com.example.pispringai.tool;
 
 import com.example.pispringai.agent.AgentRunOptions;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,8 +24,16 @@ public class ToolRegistry {
     }
 
     public List<AgentTool> enabledTools(AgentRunOptions options) {
+        return enabledTools(options, List.of());
+    }
+
+    public List<AgentTool> enabledTools(AgentRunOptions options, List<? extends AgentTool> additionalTools) {
         Objects.requireNonNull(options, "options must not be null");
-        return tools.stream()
+        Objects.requireNonNull(additionalTools, "additionalTools must not be null");
+        List<AgentTool> candidates = new ArrayList<>(tools);
+        candidates.addAll(additionalTools);
+        indexTools(candidates);
+        return candidates.stream()
                 .filter(tool -> isEnabled(tool.spec(), options))
                 .toList();
     }
@@ -53,6 +62,7 @@ public class ToolRegistry {
             case READ_ONLY -> spec.enabledByDefault();
             case WRITE -> options.allowWrite();
             case BASH -> options.allowBash();
+            case MCP -> options.allowMcp();
         };
     }
 }

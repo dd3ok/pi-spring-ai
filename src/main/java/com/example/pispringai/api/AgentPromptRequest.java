@@ -2,7 +2,7 @@ package com.example.pispringai.api;
 
 import com.example.pispringai.agent.AgentRunOptions;
 
-public record AgentPromptRequest(String text, Boolean allowWrite, Boolean allowBash) {
+public record AgentPromptRequest(String text, Boolean allowWrite, Boolean allowBash, Boolean allowMcp) {
 
     public AgentPromptRequest {
         if (text == null || text.isBlank()) {
@@ -15,6 +15,7 @@ public record AgentPromptRequest(String text, Boolean allowWrite, Boolean allowB
         return new AgentRunOptions(
                 Boolean.TRUE.equals(allowWrite),
                 Boolean.TRUE.equals(allowBash),
+                Boolean.TRUE.equals(allowMcp),
                 defaults.maxTurns(),
                 defaults.maxToolCalls(),
                 defaults.timeout());

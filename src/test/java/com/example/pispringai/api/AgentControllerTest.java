@@ -70,7 +70,7 @@ class AgentControllerTest {
                 .uri("/api/sessions/s_existing/messages/stream")
                 .accept(MediaType.TEXT_EVENT_STREAM)
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"text\":\"hello\",\"allowWrite\":true,\"allowBash\":false}")
+                .bodyValue("{\"text\":\"hello\",\"allowWrite\":true,\"allowBash\":false,\"allowMcp\":true}")
                 .exchange()
                 .expectStatus().isOk()
                 .expectHeader().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM)
@@ -88,6 +88,7 @@ class AgentControllerTest {
         assertThat(runtime.lastCommand.userText()).isEqualTo("hello");
         assertThat(runtime.lastCommand.options().allowWrite()).isTrue();
         assertThat(runtime.lastCommand.options().allowBash()).isFalse();
+        assertThat(runtime.lastCommand.options().allowMcp()).isTrue();
     }
 
     @Test
@@ -102,6 +103,7 @@ class AgentControllerTest {
 
         assertThat(runtime.lastCommand.options().allowWrite()).isFalse();
         assertThat(runtime.lastCommand.options().allowBash()).isFalse();
+        assertThat(runtime.lastCommand.options().allowMcp()).isFalse();
     }
 
     @Test

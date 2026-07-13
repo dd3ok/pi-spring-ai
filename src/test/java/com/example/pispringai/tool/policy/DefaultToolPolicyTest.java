@@ -54,6 +54,17 @@ class DefaultToolPolicyTest {
     }
 
     @Test
+    void deniesMcpToolWhenAllowMcpIsFalse() {
+        ToolPolicyDecision decision = policy.before(
+                tool("mcp_demo_echo", ToolSafetyLevel.MCP),
+                NO_ARGUMENTS,
+                context(AgentRunOptions.safeDefaults()));
+
+        assertThat(decision.denied()).isTrue();
+        assertThat(decision.reason()).contains("allowMcp");
+    }
+
+    @Test
     void allowsWriteAndBashToolsWhenRunOptionsAllowThem() {
         ToolExecutionContext context = context(new AgentRunOptions(
                 true,
@@ -65,6 +76,20 @@ class DefaultToolPolicyTest {
         assertThat(policy.before(tool("write", ToolSafetyLevel.WRITE), NO_ARGUMENTS, context).allowed())
                 .isTrue();
         assertThat(policy.before(tool("bash", ToolSafetyLevel.BASH), NO_ARGUMENTS, context).allowed())
+                .isTrue();
+    }
+
+    @Test
+    void allowsMcpToolWhenRunOptionsAllowIt() {
+        ToolExecutionContext context = context(new AgentRunOptions(
+                false,
+                false,
+                true,
+                6,
+                12,
+                Duration.ofSeconds(120)));
+
+        assertThat(policy.before(tool("mcp_demo_echo", ToolSafetyLevel.MCP), NO_ARGUMENTS, context).allowed())
                 .isTrue();
     }
 

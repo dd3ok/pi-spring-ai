@@ -555,6 +555,7 @@ Spring AI MCP client를 post-MVP adapter로 붙여 외부 MCP tool을 기존 too
 범위:
 - Spring AI MCP client starter 필요 여부와 dependency 이유 문서화
 - MCP client 기본 비활성 또는 명시 설정 기반 활성화
+- request의 allowMcp 기본값 false와 명시적 활성화
 - tool filtering/name prefix 정책 정리
 - MCP tool 실행이 ToolPolicy를 우회하지 않도록 adapter 설계
 - fake/local MCP server 기반 테스트
@@ -568,6 +569,7 @@ Spring AI MCP client를 post-MVP adapter로 붙여 외부 MCP tool을 기존 too
 
 완료 조건:
 - MCP disabled 상태에서 기존 built-in tools가 그대로 동작함
+- MCP enabled 상태에서도 allowlist와 allowMcp=true가 없으면 외부 tool이 노출되지 않음
 - MCP enabled demo가 기존 event/session 흐름에 기록됨
 - API key 없이 ./gradlew test 통과
 ```
