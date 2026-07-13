@@ -229,6 +229,16 @@ MCP는 post-MVP 본편에 포함할 수 있지만, `ToolRegistry`, `ToolExecutio
 `ToolPolicy`, SSE, JSONL session 구조를 대체하지 않는다. RAG/Vector DB는 Spring AI가
 지원하더라도 이 프로젝트의 본편 주제인 coding agent runtime과 분리한다.
 
+M14 구현에서는 `spring-ai-starter-mcp-client-webflux`를 production dependency로
+추가한다. 기존 WebFlux 애플리케이션에서 Spring AI가 MCP transport, client lifecycle,
+tool discovery를 담당하게 하기 위한 선택이다. MCP SDK 버전은 직접 고정하지 않고
+Spring AI BOM을 따른다.
+
+MCP client와 MCP tool은 모두 기본 비활성화한다. 애플리케이션의 MCP client 설정,
+`serverName/toolName` allowlist, request의 `allowMcp=true`가 모두 충족돼야 tool을
+모델에 노출한다. MCP callback도 기존 `ToolRegistry`, `ToolExecutionService`,
+`ToolPolicy`, SSE, JSONL session 흐름을 통과한다.
+
 ---
 
 ## 6. 성공 기준
@@ -291,6 +301,7 @@ README에서 다음을 설명할 수 있어야 한다.
 | Language | Java 21 |
 | Framework | Spring Boot 4.x |
 | AI | Spring AI 2.x |
+| MCP Client | Spring AI WebFlux MCP client starter, opt-in |
 | Build | Gradle Kotlin DSL |
 | Web | Spring WebFlux |
 | Event Streaming | Server-Sent Events |

@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(properties = {
         "AGENT_MODEL_PROVIDER=google-genai",
+        "AGENT_MCP_ENABLED=false",
         "spring.ai.google.genai.api-key=test-gemini-api-key",
         "agent.session.root=build/test-session-store-spring"
 })

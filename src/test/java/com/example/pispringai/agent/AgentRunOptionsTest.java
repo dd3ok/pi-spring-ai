@@ -15,6 +15,7 @@ class AgentRunOptionsTest {
 
         assertThat(options.allowWrite()).isFalse();
         assertThat(options.allowBash()).isFalse();
+        assertThat(options.allowMcp()).isFalse();
         assertThat(options.maxTurns()).isEqualTo(6);
         assertThat(options.maxToolCalls()).isEqualTo(12);
         assertThat(options.timeout()).isEqualTo(Duration.ofSeconds(120));

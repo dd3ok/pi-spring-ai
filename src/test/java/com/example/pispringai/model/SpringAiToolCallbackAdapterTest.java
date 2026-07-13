@@ -1,6 +1,7 @@
 package com.example.pispringai.model;
 
 import com.example.pispringai.agent.AgentRunOptions;
+import com.example.pispringai.mcp.McpToolBridge;
 import com.example.pispringai.tool.AgentTool;
 import com.example.pispringai.tool.ToolArguments;
 import com.example.pispringai.tool.ToolExecutionContext;
@@ -24,6 +25,8 @@ import org.springframework.beans.factory.ObjectProvider;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 class SpringAiToolCallbackAdapterTest {
 
@@ -54,6 +57,32 @@ class SpringAiToolCallbackAdapterTest {
         assertThat(schema.path("type").asText()).isEqualTo("object");
         assertThat(schema.path("properties").path("path").path("type").asText()).isEqualTo("string");
         assertThat(schema.path("additionalProperties").asBoolean()).isFalse();
+    }
+
+    @Test
+    void preservesProvidedMcpToolDefinitionWithoutRebuildingItsSchema() throws Exception {
+        AgentTool tool = new StubTool("mcp_demo_search", ToolSafetyLevel.MCP, false);
+        ToolDefinition providedDefinition = ToolDefinition.builder()
+                .name("mcp_demo_search")
+                .description("Search through an MCP server")
+                .inputSchema("""
+                        {"type":"object","properties":{"filters":{"type":"array","items":{"type":"string"}}},"required":["filters"]}
+                        """)
+                .build();
+        ToolCallback callback = new SpringAiToolCallbackAdapter(
+                tool,
+                new RecordingToolExecutionService(ToolResult.ok("unused")),
+                new AgentRunOptions(false, false, true, 6, 12, Duration.ofSeconds(120)),
+                null,
+                objectMapper,
+                SpringAiToolCallbackEvents.noop(),
+                providedDefinition);
+
+        assertThat(callback.getToolDefinition()).isSameAs(providedDefinition);
+        JsonNode schema = objectMapper.readTree(callback.getToolDefinition().inputSchema());
+        assertThat(schema.path("required").get(0).asText()).isEqualTo("filters");
+        assertThat(schema.path("properties").path("filters").path("items").path("type").asText())
+                .isEqualTo("string");
     }
 
     @Test
@@ -195,11 +224,13 @@ class SpringAiToolCallbackAdapterTest {
         AgentTool bash = new StubTool("bash", ToolSafetyLevel.BASH, false);
         ToolRegistry registry = new ToolRegistry(List.of(read, write, bash));
         RecordingToolExecutionService executionService = new RecordingToolExecutionService(ToolResult.ok("unused"));
+        McpToolBridge mcpToolBridge = mock(McpToolBridge.class);
         SpringAiToolCallbackFactory factory = new SpringAiToolCallbackFactory(
                 registry,
                 executionService,
                 objectMapper,
-                SpringAiToolCallbackEvents.noop());
+                SpringAiToolCallbackEvents.noop(),
+                mcpToolBridge);
 
         List<ToolCallback> callbacks = factory.callbacksFor(new AgentRunOptions(
                 true,
@@ -214,6 +245,7 @@ class SpringAiToolCallbackAdapterTest {
         assertThat(factory.providerFor(AgentRunOptions.safeDefaults()).getToolCallbacks())
                 .extracting(callback -> callback.getToolDefinition().name())
                 .containsExactly("read");
+        verifyNoInteractions(mcpToolBridge);
     }
 
     @Test
@@ -225,7 +257,8 @@ class SpringAiToolCallbackAdapterTest {
                 registry,
                 executionService,
                 objectMapper,
-                (ObjectProvider<SpringAiToolCallbackEvents>) null);
+                (ObjectProvider<SpringAiToolCallbackEvents>) null,
+                mock(McpToolBridge.class));
 
         assertThat(factory.callbacksFor(AgentRunOptions.safeDefaults()))
                 .extracting(callback -> callback.getToolDefinition().name())

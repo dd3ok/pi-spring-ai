@@ -64,6 +64,37 @@ class ToolRegistryTest {
     }
 
     @Test
+    void includesAdditionalMcpToolsOnlyWhenRunOptionsAllowThem() {
+        AgentTool read = new StubTool("read");
+        AgentTool mcp = new StubTool("mcp_demo_echo", ToolSafetyLevel.MCP, false);
+        ToolRegistry registry = new ToolRegistry(List.of(read));
+
+        assertThat(registry.enabledTools(AgentRunOptions.safeDefaults(), List.of(mcp)))
+                .containsExactly(read);
+
+        AgentRunOptions allowMcp = new AgentRunOptions(
+                false,
+                false,
+                true,
+                6,
+                12,
+                Duration.ofSeconds(120));
+        assertThat(registry.enabledTools(allowMcp, List.of(mcp)))
+                .containsExactly(read, mcp);
+    }
+
+    @Test
+    void rejectsAdditionalToolNameCollision() {
+        ToolRegistry registry = new ToolRegistry(List.of(new StubTool("read")));
+
+        assertThatThrownBy(() -> registry.enabledTools(
+                AgentRunOptions.safeDefaults(),
+                List.of(new StubTool("read", ToolSafetyLevel.MCP, false))))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("duplicate tool name");
+    }
+
+    @Test
     void rejectsUnknownToolName() {
         ToolRegistry registry = new ToolRegistry(List.of(new StubTool("read")));
 

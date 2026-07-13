@@ -39,7 +39,7 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
             ObjectMapper objectMapper,
             SpringAiToolCallbackEvents events
     ) {
-        this(tool, toolExecutionService, options, null, objectMapper, events);
+        this(tool, toolExecutionService, options, null, objectMapper, events, null);
     }
 
     public SpringAiToolCallbackAdapter(
@@ -50,6 +50,18 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
             ObjectMapper objectMapper,
             SpringAiToolCallbackEvents events
     ) {
+        this(tool, toolExecutionService, options, workspaceRoot, objectMapper, events, null);
+    }
+
+    public SpringAiToolCallbackAdapter(
+            AgentTool tool,
+            ToolExecutionService toolExecutionService,
+            AgentRunOptions options,
+            Path workspaceRoot,
+            ObjectMapper objectMapper,
+            SpringAiToolCallbackEvents events,
+            ToolDefinition toolDefinition
+    ) {
         this.tool = Objects.requireNonNull(tool, "tool must not be null");
         this.spec = Objects.requireNonNull(tool.spec(), "tool spec must not be null");
         this.toolExecutionService = Objects.requireNonNull(
@@ -58,7 +70,7 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
         this.context = new ToolExecutionContext(Objects.requireNonNull(options, "options must not be null"), workspaceRoot);
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
         this.events = Objects.requireNonNull(events, "events must not be null");
-        this.toolDefinition = toToolDefinition(spec);
+        this.toolDefinition = resolveToolDefinition(toolDefinition);
     }
 
     @Override
@@ -94,6 +106,16 @@ public class SpringAiToolCallbackAdapter implements ToolCallback {
                 .description(spec.description())
                 .inputSchema(toJsonSchema(spec.inputSchema()))
                 .build();
+    }
+
+    private ToolDefinition resolveToolDefinition(ToolDefinition providedDefinition) {
+        if (providedDefinition == null) {
+            return toToolDefinition(spec);
+        }
+        if (!spec.name().equals(providedDefinition.name())) {
+            throw new IllegalArgumentException("tool definition name must match tool spec: " + spec.name());
+        }
+        return providedDefinition;
     }
 
     private String toJsonSchema(Map<String, Object> inputSchema) {

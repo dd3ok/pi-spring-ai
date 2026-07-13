@@ -9,7 +9,7 @@ history로 남기는 구조를 Java/Spring 개발자가 읽고 설명할 수 있
 
 ## 현재 상태
 
-M0부터 M13까지 구현되어 있다.
+M0부터 M14까지 구현되어 있다.
 
 - Java 21 toolchain with `--release 21`
 - Spring Boot 4.1.0
@@ -21,6 +21,7 @@ M0부터 M13까지 구현되어 있다.
 - `AgentRuntime` + SSE event stream
 - built-in tools: `ls`, `read`, `find`, `grep`, `write`, `edit`, `bash`
 - `ToolRegistry`, `ToolExecutionService`, `ToolPolicy` 기반 safety gate
+- Spring AI MCP client를 통한 opt-in external tool 연결
 
 테스트는 외부 LLM API를 호출하지 않는다. API key가 없어도 `./gradlew test`가
 통과해야 하며, 테스트에서는 fake runtime/model 또는 dummy key만 사용한다.
@@ -35,10 +36,14 @@ Client
   -> AgentRuntime
   -> ModelClient
   -> Spring AI ChatClient
+  -> request-scoped ToolCallbackProvider
+     -> built-in AgentTool
+     -> Spring AI MCP ToolCallback -> McpAgentTool
+  -> ToolRegistry
   -> SpringAiToolCallbackAdapter
   -> ToolExecutionService
   -> ToolPolicy
-  -> built-in tool
+  -> built-in tool or MCP server
   -> AgentEvent SSE + JSONL session history
 ```
 
@@ -49,6 +54,7 @@ Client
 | `agent` | `AgentRuntime`, run options, prompt command, event/message domain |
 | `api` | REST/SSE controller와 request/response DTO |
 | `model` | Spring AI `ChatClient` wrapper와 tool callback adapter |
+| `mcp` | Spring AI MCP client filter, name prefix, internal tool bridge |
 | `session` | JSONL session store |
 | `tool` | built-in tools, registry, execution service, policy |
 | `workspace` | workspace root, safe path resolver, secret file guard |
@@ -58,6 +64,14 @@ Client
 주요 기본값은 `src/main/resources/application.yml`에 있다.
 
 ```yaml
+spring:
+  ai:
+    mcp:
+      client:
+        enabled: false
+        type: SYNC
+        request-timeout: 20s
+
 agent:
   workspace:
     root: .
@@ -71,6 +85,8 @@ agent:
     max-tool-output-chars: 20000
   session:
     root: .pi-spring-ai/sessions
+  mcp:
+    allowed-tools: []
 ```
 
 실제 모델 호출에는 provider별 API key가 필요하다.
@@ -95,6 +111,25 @@ $env:AGENT_MODEL_NAME = "gpt-4.1-mini"
 
 macOS/Linux에서는 같은 환경 변수를 export한 뒤 `./gradlew bootRun`을 실행한다.
 
+### MCP client 설정
+
+MCP client는 기본 비활성화다. Spring AI의 WebFlux MCP client starter가 연결과 tool
+discovery를 담당하고, 발견한 tool은 기존 `ToolRegistry`, `ToolPolicy`, event/session
+경계를 통과한다.
+
+예를 들어 Streamable HTTP MCP server가 `http://localhost:3001/mcp`에서 실행 중이고,
+server info name이 `demo`, tool name이 `echo`라면 다음처럼 실행할 수 있다.
+
+```powershell
+$env:AGENT_MCP_ENABLED = "true"
+$env:AGENT_MCP_ALLOWED_TOOLS = "demo/echo"
+.\gradlew.bat bootRun --args="--spring.ai.mcp.client.streamable-http.connections.demo.url=http://localhost:3001"
+```
+
+허용 목록은 MCP connection 설정 이름이 아니라 server가 initialize 응답으로 제공한
+`serverName/toolName` 형식이다. 위 tool은 모델에 `mcp_demo_echo`라는 이름으로 노출된다.
+연결을 활성화해도 request에서 `allowMcp=true`를 보내지 않으면 MCP tool은 노출되지 않는다.
+
 ## 테스트
 
 ```bash
@@ -107,7 +142,7 @@ Windows PowerShell:
 .\gradlew.bat test
 ```
 
-이 명령은 로컬 테스트만 실행한다. 실제 Gemini/OpenAI API를 호출하지 않아야 한다.
+이 명령은 로컬 테스트만 실행한다. 실제 Gemini/OpenAI API나 원격 MCP server를 호출하지 않아야 한다.
 
 ## API 사용법
 
@@ -157,7 +192,7 @@ $session
 ### Message stream
 
 같은 session에 메시지를 보내면 `text/event-stream`으로 agent event가 흐른다.
-`allowWrite`와 `allowBash`는 request 단위 옵션이며, 생략하면 둘 다 `false`다.
+`allowWrite`, `allowBash`, `allowMcp`는 request 단위 옵션이며, 생략하면 모두 `false`다.
 
 ```powershell
 Invoke-WebRequest `
@@ -165,7 +200,7 @@ Invoke-WebRequest `
   -Uri "http://localhost:8080/api/sessions/$($session.sessionId)/messages/stream" `
   -ContentType "application/json" `
   -Headers @{ Accept = "text/event-stream" } `
-  -Body '{"text":"프로젝트 구조를 간단히 설명해줘","allowWrite":false,"allowBash":false}'
+  -Body '{"text":"프로젝트 구조를 간단히 설명해줘","allowWrite":false,"allowBash":false,"allowMcp":false}'
 ```
 
 SSE 응답은 다음 형태다.
@@ -239,17 +274,34 @@ JSONL이 중요한 이유는 단순하다. agent가 어떤 user message를 받�
 따라서 모델이 어떤 경로로든 `write`, `edit`, `bash` 실행을 요청하더라도 request
 option이 없으면 실행 전에 거부된다.
 
+외부 MCP tool은 built-in tool이 아니다. 애플리케이션의 MCP client 활성화,
+`agent.mcp.allowed-tools` allowlist, request의 `allowMcp=true`가 모두 충족될 때만
+모델에 노출되며, 실행 결과에는 기존 공통 output limit이 적용된다.
+
 ## Safety policy
 
 기본 모드는 read-only다.
 
-- `allowWrite=false`, `allowBash=false`가 safe default다.
+- `allowWrite=false`, `allowBash=false`, `allowMcp=false`가 safe default다.
 - read-only tools는 기본 활성화된다.
 - `write`, `edit`은 `allowWrite=true`일 때만 활성화된다.
 - `bash`는 `allowBash=true`일 때만 활성화된다.
+- MCP tool은 client 활성화, allowlist, `allowMcp=true`가 모두 필요하다.
 - `application.yml`에도 `write-enabled-by-default=false`,
   `bash-enabled-by-default=false`를 둔다. 현재 실행 gate는 request의
   `allowWrite`, `allowBash` 값으로 결정된다.
+
+MCP safety:
+
+- Spring AI MCP client는 기본 비활성화
+- allowlist에 없는 `serverName/toolName`은 discovery 단계에서 제외
+- MCP tool 이름은 `mcp_<server>_<tool>` prefix로 built-in tool과 분리
+- MCP tool도 `ToolExecutionService`와 `ToolPolicy`를 통과
+- MCP request timeout과 기존 tool output limit 적용
+- tool call과 결과를 기존 SSE event와 JSONL history에 기록
+- MCP tool annotation은 권한 판단 근거로 사용하지 않음
+- 원격 MCP server의 파일/명령 접근은 로컬 `SafePathResolver` 보호 범위 밖이므로,
+  server 자체를 별도 sandbox와 workspace 제한으로 실행해야 함
 
 Workspace safety:
 
@@ -292,7 +344,8 @@ M12에서 회귀 테스트로 고정한 safety 사례:
 {
   "text": "이 프로젝트의 구조와 핵심 패키지를 설명해줘",
   "allowWrite": false,
-  "allowBash": false
+  "allowBash": false,
+  "allowMcp": false
 }
 ```
 
@@ -310,7 +363,8 @@ M12에서 회귀 테스트로 고정한 safety 사례:
 {
   "text": "docs/demo-note.md 파일을 만들고, 오늘 데모에서 확인할 항목 3개를 적어줘",
   "allowWrite": true,
-  "allowBash": false
+  "allowBash": false,
+  "allowMcp": false
 }
 ```
 
@@ -328,7 +382,8 @@ M12에서 회귀 테스트로 고정한 safety 사례:
 {
   "text": "bash tool로 테스트 명령을 실행해줘. Windows면 .\\gradlew.bat test, Unix면 ./gradlew test를 사용해줘.",
   "allowWrite": false,
-  "allowBash": true
+  "allowBash": true,
+  "allowMcp": false
 }
 ```
 
@@ -346,7 +401,8 @@ M12에서 회귀 테스트로 고정한 safety 사례:
 {
   "text": "bash tool로 rm -rf . 명령이 실행 가능한지 확인해줘",
   "allowWrite": false,
-  "allowBash": true
+  "allowBash": true,
+  "allowMcp": false
 }
 ```
 
@@ -375,10 +431,30 @@ Invoke-RestMethod `
   `.pi-spring-ai/sessions/{sessionId}/events.jsonl`을 직접 열어도 같은 흐름을 확인할 수 있다.
 - 이 조회 API는 replay/debug용이며 branch/fork, compaction, DB 저장을 구현하지 않는다.
 
+### 6. MCP tool 명시 활성화
+
+목표: Spring AI가 발견한 외부 tool도 기존 policy와 기록 흐름을 통과하는지 본다.
+
+```json
+{
+  "text": "MCP echo tool로 hello를 보내고 결과를 설명해줘",
+  "allowWrite": false,
+  "allowBash": false,
+  "allowMcp": true
+}
+```
+
+확인할 것:
+
+- MCP client가 비활성화됐거나 allowlist에 없으면 tool이 모델에 노출되지 않는다.
+- 허용된 tool은 `mcp_demo_echo`처럼 prefix된 이름으로 노출된다.
+- 실행 시 `tool_call_started`, `tool_call_finished` SSE event가 발생한다.
+- tool result가 `messages.jsonl`, event가 `events.jsonl`에 기록된다.
+
 ## 다음 확장 방향
 
-M0부터 M13까지는 작은 Pi-inspired coding agent harness의 MVP, safety hardening,
-session history polish 단계다.
+M0부터 M14까지는 작은 Pi-inspired coding agent harness의 MVP, safety hardening,
+session history polish, MCP client integration 단계다.
 이후 본편은 기능을 넓히기보다, 이미 만든 runtime/tool/session 구조를 더 설명 가능하게
 단단히 만드는 순서로 진행한다.
 
@@ -386,7 +462,7 @@ session history polish 단계다.
 |---|---|---|---|
 | M12 | 완료 | Tool safety hardening | path/secret/bash deny 사례를 더 촘촘히 테스트하고, 기존 output limit 회귀 테스트를 유지 |
 | M13 | 완료 | Session history/replay polish | SSE와 JSONL session history를 조회, 설명, 재현 가능한 흐름으로 정리 |
-| M14 | 다음 | MCP client integration | 외부 MCP server의 tool을 기존 `ToolRegistry`/`ToolPolicy` 경계 안으로 opt-in 연결 |
+| M14 | 완료 | MCP client integration | 외부 MCP server의 tool을 기존 `ToolRegistry`/`ToolPolicy` 경계 안으로 opt-in 연결 |
 | M15 | 다음 | MCP server exposure | 현재 built-in tools를 Spring AI MCP server로 노출하되 read-only와 opt-in 원칙 유지 |
 
 시즌 2 또는 옵션으로 미룰 항목:

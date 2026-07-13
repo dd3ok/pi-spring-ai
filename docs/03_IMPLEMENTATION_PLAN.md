@@ -633,6 +633,15 @@ Spring AI MCP client를 post-MVP adapter로 붙여 외부 MCP tool을 기존 too
 - MCP enabled demo가 기존 event/session 흐름에 기록된다.
 - API key 없이 `./gradlew test`가 통과한다.
 
+### 구현 결정
+
+- WebFlux 애플리케이션과 맞는 `spring-ai-starter-mcp-client-webflux`를 사용한다.
+- MCP client는 설정에서 기본 비활성화하고, tool은 allowlist와 `allowMcp=true`를 모두 요구한다.
+- Spring AI의 `McpToolFilter`, `McpToolNamePrefixGenerator`, `SyncMcpToolCallbackProvider`를 사용한다.
+- MCP callback은 request 시점에 조회해 `McpAgentTool`로 감싼 뒤 기존 registry/policy를 통과시킨다.
+- MCP callback의 원본 `ToolDefinition`을 유지한다.
+- 테스트에서는 fake MCP callback/provider를 사용하고 외부 transport를 호출하지 않는다.
+
 ---
 
 ## M15. MCP server exposure

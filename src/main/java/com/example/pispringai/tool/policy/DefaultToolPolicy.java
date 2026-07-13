@@ -34,6 +34,9 @@ public class DefaultToolPolicy implements ToolPolicy {
             case BASH -> context.options().allowBash()
                     ? ToolPolicyDecision.allow()
                     : ToolPolicyDecision.deny("tool requires allowBash=true: " + tool.spec().name());
+            case MCP -> context.options().allowMcp()
+                    ? ToolPolicyDecision.allow()
+                    : ToolPolicyDecision.deny("tool requires allowMcp=true: " + tool.spec().name());
         };
     }
 

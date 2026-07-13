@@ -6,10 +6,21 @@ import java.util.Objects;
 public record AgentRunOptions(
         boolean allowWrite,
         boolean allowBash,
+        boolean allowMcp,
         int maxTurns,
         int maxToolCalls,
         Duration timeout
 ) {
+
+    public AgentRunOptions(
+            boolean allowWrite,
+            boolean allowBash,
+            int maxTurns,
+            int maxToolCalls,
+            Duration timeout
+    ) {
+        this(allowWrite, allowBash, false, maxTurns, maxToolCalls, timeout);
+    }
 
     public AgentRunOptions {
         Objects.requireNonNull(timeout, "timeout must not be null");
@@ -25,6 +36,6 @@ public record AgentRunOptions(
     }
 
     public static AgentRunOptions safeDefaults() {
-        return new AgentRunOptions(false, false, 6, 12, Duration.ofSeconds(120));
+        return new AgentRunOptions(false, false, false, 6, 12, Duration.ofSeconds(120));
     }
 }

@@ -13,6 +13,7 @@ import org.springframework.core.io.ClassPathResource;
 
 @SpringBootTest(properties = {
         "AGENT_MODEL_PROVIDER=google-genai",
+        "AGENT_MCP_ENABLED=false",
         "GEMINI_MODEL=gemini-2.5-flash",
         "AGENT_MODEL_NAME=gemini-2.5-flash",
         "OPENAI_MODEL=gpt-4.1-mini",
@@ -52,5 +53,11 @@ class ModelProviderConfigurationTest {
                 .isEqualTo("${AGENT_MODEL_NAME:${GEMINI_MODEL:gemini-2.5-flash}}");
         assertThat(applicationYaml.getProperty("spring.ai.openai.chat.model"))
                 .isEqualTo("${OPENAI_MODEL:gpt-4.1-mini}");
+        assertThat(applicationYaml.getProperty("spring.ai.mcp.client.enabled"))
+                .isEqualTo("${AGENT_MCP_ENABLED:false}");
+        assertThat(applicationYaml.getProperty("spring.ai.mcp.client.type"))
+                .isEqualTo("SYNC");
+        assertThat(applicationYaml.getProperty("agent.mcp.allowed-tools"))
+                .isEqualTo("${AGENT_MCP_ALLOWED_TOOLS:}");
     }
 }

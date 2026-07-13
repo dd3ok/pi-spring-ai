@@ -13,6 +13,11 @@ spring:
       api-key: ${OPENAI_API_KEY:}
       chat:
         model: ${OPENAI_MODEL:gpt-4.1-mini}
+    mcp:
+      client:
+        enabled: ${AGENT_MCP_ENABLED:false}
+        type: SYNC
+        request-timeout: ${AGENT_MCP_REQUEST_TIMEOUT:20s}
 
 agent:
   workspace:
@@ -30,3 +35,5 @@ agent:
   model:
     provider: ${AGENT_MODEL_PROVIDER:google-genai}
     name: ${AGENT_MODEL_NAME:${GEMINI_MODEL:gemini-2.5-flash}}
+  mcp:
+    allowed-tools: ${AGENT_MCP_ALLOWED_TOOLS:}

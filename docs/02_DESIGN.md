@@ -966,6 +966,30 @@ session 구조를 유지한 채 안전성, 재현성, MCP 연결성을 늘리는
 - 기본 테스트는 외부 MCP server, 외부 LLM API, API key 없이 통과해야 한다.
 - MCP 보안 모델은 프로젝트의 workspace safety와 command policy를 약화시키면 안 된다.
 
+M14 client adapter는 다음 흐름으로 고정한다.
+
+```text
+Spring AI SyncMcpToolCallbackProvider
+  -> McpToolFilter / McpToolNamePrefixGenerator
+  -> McpToolBridge
+  -> request-scoped McpAgentTool
+  -> ToolRegistry
+  -> SpringAiToolCallbackAdapter
+  -> ToolExecutionService / ToolPolicy
+  -> MCP server
+  -> existing SSE event / JSONL session history
+```
+
+- `spring-ai-starter-mcp-client-webflux`를 사용하고 client type은 `SYNC`로 둔다.
+- `spring.ai.mcp.client.enabled=false`와 `AgentRunOptions.allowMcp=false`가 기본값이다.
+- allowlist는 server initialize 정보의 `serverName/toolName`을 기준으로 한다.
+- MCP tool은 `mcp_<server>_<tool>` 이름으로 built-in tool과 분리한다.
+- `ToolCallbackProvider`는 request 시점에 해석해 Spring AI의 tool cache invalidation을 유지한다.
+- MCP callback의 원본 `ToolDefinition`을 보존해 JSON Schema를 다시 축약하지 않는다.
+- MCP annotation은 신뢰할 수 있는 권한 정보로 사용하지 않는다.
+- 원격 MCP server는 로컬 `SafePathResolver` 경계 밖이므로 별도 sandbox가 필요하다.
+- M14에서는 MCP resources, prompts, sampling, async client, OAuth를 구현하지 않는다.
+
 ### 15.3 시즌 2 또는 옵션
 
 다음 항목은 본편에서 제외한다.

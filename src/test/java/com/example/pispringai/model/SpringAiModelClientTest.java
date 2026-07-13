@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.tool.ToolCallbackProvider;
 import reactor.core.publisher.Flux;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,13 +33,14 @@ class SpringAiModelClientTest {
         ChatClient.ChatClientRequestSpec request = mock(ChatClient.ChatClientRequestSpec.class);
         ChatClient.StreamResponseSpec stream = mock(ChatClient.StreamResponseSpec.class);
         SpringAiToolCallbackFactory toolCallbackFactory = mock(SpringAiToolCallbackFactory.class);
+        ToolCallbackProvider toolCallbackProvider = ToolCallbackProvider.from(List.of());
         AgentPromptCommand command = commandWithMessages();
         when(chatClient.prompt()).thenReturn(request);
         when(request.messages(anyList())).thenReturn(request);
         when(request.tools(any(Object[].class))).thenReturn(request);
         when(request.stream()).thenReturn(stream);
         when(stream.content()).thenReturn(Flux.just("model"));
-        when(toolCallbackFactory.callbacksFor(any(), any(), any())).thenReturn(List.of());
+        when(toolCallbackFactory.providerFor(any(), any(), any())).thenReturn(toolCallbackProvider);
         SpringAiModelClient client = new SpringAiModelClient(chatClient, toolCallbackFactory);
 
         List<String> chunks = client.streamText(command, SpringAiToolCallbackEvents.noop()).collectList().block();
@@ -54,6 +56,7 @@ class SpringAiModelClientTest {
         assertThat(messages.getValue().get(1).getText()).isEqualTo("answer");
         assertThat(messages.getValue().get(2)).isInstanceOf(org.springframework.ai.chat.messages.UserMessage.class);
         assertThat(messages.getValue().get(2).getText()).isEqualTo("follow up");
+        verify(request).tools(toolCallbackProvider);
     }
 
     private static AgentPromptCommand commandWithMessages() {
