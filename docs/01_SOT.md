@@ -214,6 +214,10 @@ M12~M15 본편:
 | M14 | MCP client integration | 외부 MCP tool을 기존 tool registry/policy 경계 안으로 opt-in 연결 |
 | M15 | MCP server exposure | built-in tool을 MCP server로 노출하되 read-only와 opt-in 안전 기본값 유지 |
 
+M15 구현 이후 post-MVP 본편은 완료 상태다. MCP server는 기본 비활성화하고,
+read-only tool만 기본 allowlist로 제공한다. `write`/`edit`과 `bash`는 tool 이름 노출과
+별도 permission flag를 모두 요구하며 모든 호출은 기존 workspace와 command policy를 통과한다.
+
 옵션 또는 시즌 2로 미룬다.
 
 - RAG/Vector DB

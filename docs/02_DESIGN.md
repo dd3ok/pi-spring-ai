@@ -990,7 +990,30 @@ Spring AI SyncMcpToolCallbackProvider
 - 원격 MCP server는 로컬 `SafePathResolver` 경계 밖이므로 별도 sandbox가 필요하다.
 - M14에서는 MCP resources, prompts, sampling, async client, OAuth를 구현하지 않는다.
 
-### 15.3 시즌 2 또는 옵션
+### 15.3 M15 MCP server adapter
+
+M15 server adapter는 다음 흐름으로 고정한다.
+
+```text
+External MCP client
+  -> WebFlux Streamable HTTP /mcp
+  -> McpServerToolCallbackProvider
+  -> SpringAiToolCallbackAdapter
+  -> ToolExecutionService / ToolPolicy
+  -> built-in AgentTool
+```
+
+- `spring-ai-starter-mcp-server-webflux`와 Spring AI의 `ToolCallbackProvider` 변환을 사용한다.
+- server와 annotation scanner는 기본 비활성화하고 tool capability만 명시적으로 켠다.
+- 기본 allowlist는 `ls`, `read`, `find`, `grep`이다.
+- `write`/`edit`과 `bash`는 allowlist 포함과 permission flag를 모두 요구한다.
+- server용 `AgentRunOptions.allowMcp`는 항상 false로 두어 downstream MCP tool을 재노출하지 않는다.
+- workspace root는 MCP argument가 아니라 `agent.workspace.root`로 고정한다.
+- MCP server 호출은 agent session이 아니므로 가짜 session, SSE event, JSONL history를 만들지 않는다.
+- M15는 Streamable HTTP와 동기 tool API만 사용하며 resources, prompts, completion,
+  OAuth, remote registry를 구현하지 않는다.
+
+### 15.4 시즌 2 또는 옵션
 
 다음 항목은 본편에서 제외한다.
 

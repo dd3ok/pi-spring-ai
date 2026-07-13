@@ -1,12 +1,16 @@
 package com.example.pispringai;
 
+import com.example.pispringai.mcp.McpServerToolCallbackProvider;
+import io.modelcontextprotocol.server.McpSyncServer;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webtestclient.autoconfigure.AutoConfigureWebTestClient;
-import org.springframework.context.ApplicationContext;
 import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.context.ApplicationContext;
 import org.springframework.test.web.reactive.server.WebTestClient;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @AutoConfigureWebTestClient
 @SpringBootTest(
@@ -36,8 +40,15 @@ class PiSpringAiApplicationTests {
 
     @Test
     void keepsMcpClientDisabledWithoutExplicitOptIn() {
-        org.assertj.core.api.Assertions.assertThat(
-                        applicationContext.getBeansOfType(SyncMcpToolCallbackProvider.class))
+        assertThat(applicationContext.getBeansOfType(SyncMcpToolCallbackProvider.class))
+                .isEmpty();
+    }
+
+    @Test
+    void keepsMcpServerDisabledWithoutExplicitOptIn() {
+        assertThat(applicationContext.getBeansOfType(McpServerToolCallbackProvider.class))
+                .isEmpty();
+        assertThat(applicationContext.getBeansOfType(McpSyncServer.class))
                 .isEmpty();
     }
 }
