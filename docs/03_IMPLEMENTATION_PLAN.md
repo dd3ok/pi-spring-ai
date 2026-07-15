@@ -671,6 +671,18 @@ server 역할도 할 수 있음을 보여준다.
 - write/edit/bash는 명시 opt-in 없이는 노출 또는 실행되지 않는다.
 - API key 없이 `./gradlew test`가 통과한다.
 
+### 구현 결정
+
+- WebFlux Streamable HTTP `/mcp`와 동기 `ToolCallbackProvider`를 사용한다.
+- server, annotation scanner, privileged tool은 기본 비활성화한다.
+- `McpServerToolCallbackProvider`가 allowlist를 적용한 built-in tool만 기존
+  `SpringAiToolCallbackAdapter`로 변환한다.
+- server workspace는 `agent.workspace.root`에 고정하고 MCP client 입력으로 받지 않는다.
+- downstream MCP tool, resources, prompts, completion은 노출하지 않는다.
+- 실제 local MCP client 통합 테스트로 initialize, tools/list, read, traversal deny를 검증한다.
+
+상태: 완료
+
 ---
 
 ## 시즌 2 또는 옵션 backlog

@@ -162,3 +162,20 @@ M5 구현 메모:
 - `FindTool`은 glob 기반으로 시작한다.
 - `GrepTool`은 literal substring 검색으로 시작하고 large/binary file은 skip한다.
 - M5의 output limit은 도구 내부 안전장치이고, M6의 output truncation은 공통 실행 정책으로 한 번 더 적용한다.
+
+### M15 MCP server exposure
+
+핵심 질문은 다음과 같다.
+
+- 왜 MCP server를 `AgentRuntime` 안에 넣지 않고 `ToolCallbackProvider` adapter로 두는가?
+- 왜 read-only allowlist와 privileged permission flag를 함께 확인하는가?
+- 외부 MCP 호출이 workspace safety를 우회하지 않는다는 것을 어떻게 증명하는가?
+- 왜 MCP server 호출은 SSE/JSONL agent session을 만들지 않는가?
+
+M15 구현 메모:
+
+- Spring AI 2.0.0의 WebFlux Streamable HTTP server starter를 사용한다.
+- 기본 노출은 `ls`, `read`, `find`, `grep`으로 제한한다.
+- `write`/`edit`과 `bash`는 allowlist와 permission flag를 모두 요구한다.
+- `SpringAiToolCallbackAdapter`, `ToolExecutionService`, `ToolPolicy`를 재사용한다.
+- 외부 API 없이 실제 local MCP client로 `/mcp`를 검증한다.

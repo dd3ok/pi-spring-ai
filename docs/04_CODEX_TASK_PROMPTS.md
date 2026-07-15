@@ -586,9 +586,13 @@ Task M15만 수행해줘.
 
 범위:
 - Spring AI MCP server starter 필요 여부와 dependency 이유 문서화
-- read-only tools 우선 노출
-- write/edit/bash는 opt-in 정책 유지
+- WebFlux Streamable HTTP `/mcp` 사용, server 기본 비활성화
+- `ls`, `read`, `find`, `grep`을 기본 allowlist로 노출
+- write/edit/bash는 allowlist와 별도 permission flag가 모두 필요한 이중 opt-in 유지
 - MCP server 호출도 workspace safety와 command policy를 통과하게 구성
+- server workspace를 `agent.workspace.root`에 고정
+- downstream MCP client tool 재노출 차단
+- 실제 local MCP client 기반 transport 통합 테스트
 - README에 MCP client/server demo 정리
 
 하지 말 것:
@@ -596,11 +600,14 @@ Task M15만 수행해줘.
 - plugin system 만들지 마
 - multi-agent 만들지 마
 - MCP server가 기존 REST/SSE API를 대체하게 하지 마
+- MCP 호출을 위해 가짜 agent session이나 JSONL 기록을 만들지 마
+- resources, prompts, completion, OAuth를 구현하지 마
 - bash를 기본 노출하지 마
 
 완료 조건:
 - read-only MCP server demo 가능
 - write/edit/bash는 명시 opt-in 없이는 노출 또는 실행되지 않음
+- MCP tools/call도 기존 workspace와 command policy를 통과함
 - API key 없이 ./gradlew test 통과
 ```
 

@@ -18,6 +18,27 @@ spring:
         enabled: ${AGENT_MCP_ENABLED:false}
         type: SYNC
         request-timeout: ${AGENT_MCP_REQUEST_TIMEOUT:20s}
+      server:
+        enabled: ${AGENT_MCP_SERVER_ENABLED:false}
+        name: pi-spring-ai
+        version: 0.0.1-SNAPSHOT
+        protocol: STREAMABLE
+        type: SYNC
+        request-timeout: ${AGENT_MCP_SERVER_REQUEST_TIMEOUT:35s}
+        tool-callback-converter: true
+        expose-mcp-client-tools: false
+        annotation-scanner:
+          enabled: false
+        capabilities:
+          resource: false
+          tool: true
+          prompt: false
+          completion: false
+        streamable-http:
+          mcp-endpoint: /mcp
+
+server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
 
 agent:
   workspace:
@@ -37,3 +58,7 @@ agent:
     name: ${AGENT_MODEL_NAME:${GEMINI_MODEL:gemini-2.5-flash}}
   mcp:
     allowed-tools: ${AGENT_MCP_ALLOWED_TOOLS:}
+    server:
+      exposed-tools: ${AGENT_MCP_SERVER_EXPOSED_TOOLS:ls,read,find,grep}
+      allow-write: ${AGENT_MCP_SERVER_ALLOW_WRITE:false}
+      allow-bash: ${AGENT_MCP_SERVER_ALLOW_BASH:false}
